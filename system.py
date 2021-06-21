@@ -5,7 +5,8 @@ import scipy.integrate
 # dx2dt = x1 - x2
 # dx3dt = x1 - x3 - x1^2
 
-def step_system(current_state, time, controls, step_len):
+
+def step_system(current_state, time, controls, step_len=1):
     u = controls[0]
 
     def model(t, state):

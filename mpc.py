@@ -8,6 +8,8 @@ import system
 
 from matplotlib import pyplot as plt
 import numpy as np
+import pandas as pd
+
 
 # Define a concrete model with hardcoded dynamics
 model = ConcreteModel()
@@ -97,6 +99,10 @@ sys_x1_plot = []
 sys_x2_plot = []
 sys_x3_plot = []
 
+sys_dx1dt_plot = []
+sys_dx2dt_plot = []
+sys_dx3dt_plot = []
+
 for time in model.time:
     opt.solve(model)
 
@@ -140,3 +146,6 @@ plt.xlabel("Time")
 plt.legend()
 plt.savefig("plot.svg", format="svg")
 plt.show()
+
+system_data = pd.DataFrame(zip(sys_x1_plot, sys_x2_plot, sys_x3_plot))
+system_data.to_csv("data.csv")
