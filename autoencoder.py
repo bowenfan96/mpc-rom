@@ -25,14 +25,14 @@ class Net(nn.Module):
         nn.init.kaiming_uniform_(self.fc1.weight)
         nn.init.kaiming_uniform_(self.fc2.weight)
 
-    def forward(self, x):
-        x = F.leaky_relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+    def forward(self, data):
+        data = F.leaky_relu(self.fc1(data))
+        data = self.fc2(data)
+        return data
 
 
 class Autoencoder():
-    def __init__(self, x, num_epoch=1000, config=None):
+    def __init__(self, data, num_epoch=1000, config=None):
         super(Autoencoder, self).__init__()
 
         # Hyperparameters
@@ -55,20 +55,25 @@ class Autoencoder():
             self.is_tuning = False
 
         # Initialise parameters
-        X, _ = self._preprocessor(x, training=True)
-        self.input_size = X.shape[1]
+        processed_data = self.process_data(data)
+        self.input_size = processed_data.shape[1]
 
         # Initialise neural network
         self.net = Net(self.input_size, self.hidden_size)
 
         return
 
-    def fit(self, x):
+    def process_data(self, data):
+        # Convert to torch tensors
+        data = torch.tensor(data.to_numpy(dtype=np.float32))
+        return data
+
+    def fit(self, data):
         # Set model to training model so gradients are updated
         self.net.train()
 
         # Wrap the tensors into a dataset, then load the data
-        data = torch.utils.data.TensorDataset(x)
+        data = torch.utils.data.TensorDataset(data)
         data_loader = torch.utils.data.DataLoader(data, batch_size=self.batch_size)
 
         # Create optimizer to use update rules
@@ -87,8 +92,8 @@ class Autoencoder():
                 optimizer.zero_grad()
 
             with torch.no_grad():
-                predicted = self.net(x)
-                loss = criterion(predicted, x)
+                predicted = self.net(data)
+                loss = criterion(predicted, data)
 
             # Print loss
             print('The loss of epoch ' + str(epoch) + ' is ' + str(loss.item()))
@@ -97,14 +102,15 @@ class Autoencoder():
 
 
 def autoencoder_train():
-    data = pd.read_csv("data.csv")
+    data = pd.read_csv("data.csv", sep=' ')
 
     autoencoder = Autoencoder(data, num_epoch=100)
+
     autoencoder.fit(data)
 
-def autoencoder_test():
+# def autoencoder_test():
 
 
 if __name__ == "__main__":
     autoencoder_train()
-    autoencoder_test()
+    # autoencoder_test()
