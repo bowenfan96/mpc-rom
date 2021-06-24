@@ -4,6 +4,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
+from torchinfo import summary
+
 import pickle
 import numpy as np
 import pandas as pd
@@ -26,7 +28,9 @@ class Net(nn.Module):
         nn.init.kaiming_uniform_(self.fc2.weight)
 
     def forward(self, data):
+        # Input to hidden activation
         data = F.leaky_relu(self.fc1(data))
+        # Hidden to output - no activation
         data = self.fc2(data)
         return data
 
@@ -123,6 +127,9 @@ def autoencoder_train():
     autoencoder = Autoencoder(data, num_epoch=1000)
 
     autoencoder.fit(data)
+
+    # Print a model.summary to show hidden layer information
+    summary(autoencoder.net.to("cpu"), verbose=2)
 
 # def autoencoder_test():
 
