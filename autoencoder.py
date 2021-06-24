@@ -51,11 +51,13 @@ class Autoencoder():
             self.num_epoch = num_epoch
             self.batch_size = 6
             self.learning_rate = 0.049
-            self.hidden_size = 17
+            self.hidden_size = 2
             self.is_tuning = False
 
         # Initialise parameters
         processed_data = self.process_data(data)
+
+        # Input size is the same as output size
         self.input_size = processed_data.shape[1]
 
         # Initialise neural network
@@ -63,17 +65,21 @@ class Autoencoder():
 
         return
 
-    def process_data(self, data):
+    @staticmethod
+    def process_data(data):
         # Convert to torch tensors
         data = torch.tensor(data.to_numpy(dtype=np.float32))
         return data
 
     def fit(self, data):
+        # Process data, convert pandas to tensor
+        data = self.process_data(data)
+
         # Set model to training model so gradients are updated
         self.net.train()
 
         # Wrap the tensors into a dataset, then load the data
-        data = torch.utils.data.TensorDataset(data)
+        # data = torch.utils.data.TensorDataset(data)
         data_loader = torch.utils.data.DataLoader(data, batch_size=self.batch_size)
 
         # Create optimizer to use update rules
@@ -83,17 +89,27 @@ class Autoencoder():
         criterion = nn.MSELoss()
 
         # Train the neural network
-        for epoch in range(self.nb_epoch):
-            for x_train_mb, y_train_mb in data_loader:
-                y_pred = self.net(x_train_mb)
-                loss = criterion(y_pred, y_train_mb)
+        for epoch in range(self.num_epoch):
+
+            # Full dataset gradient descent (for debugging only, poor accuracy)
+            # output = self.net(data)
+            # loss = criterion(output, data)
+            # loss.backward()
+            # optimizer.step()
+            # optimizer.zero_grad()
+
+            # Minibatch gradient descent
+            for minibatch_data in data_loader:
+                output = self.net(minibatch_data)
+                loss = criterion(output, minibatch_data)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
 
+            # Test entire dataset at this epoch
             with torch.no_grad():
-                predicted = self.net(data)
-                loss = criterion(predicted, data)
+                output = self.net(data)
+                loss = criterion(output, data)
 
             # Print loss
             print('The loss of epoch ' + str(epoch) + ' is ' + str(loss.item()))
@@ -104,7 +120,7 @@ class Autoencoder():
 def autoencoder_train():
     data = pd.read_csv("data.csv", sep=' ')
 
-    autoencoder = Autoencoder(data, num_epoch=100)
+    autoencoder = Autoencoder(data, num_epoch=1000)
 
     autoencoder.fit(data)
 
