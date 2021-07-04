@@ -1,11 +1,50 @@
 import numpy as np
 import scipy.integrate
-
 import matplotlib.pyplot as plt
+import casadi
 
-# dx1dt = -2x1 + x2 + x3 + u
-# dx2dt = x1 - x2
-# dx3dt = x1 - x3 - x1^2
+
+class System:
+
+    def __init__(self, xi_csv, a_csv, b_csv, c_csv, d_csv=None):
+        """
+        Initialize a linear system model using A, B, C, D matrices:
+        x_dot = Ax + Bu
+        y = Cx + Du
+        D can be empty
+        """
+        self.A = np.genfromtxt(a_csv, delimiter=',')
+        self.B = np.genfromtxt(b_csv, delimiter=',')
+        self.C = np.genfromtxt(c_csv, delimiter=',')
+        self.D = np.genfromtxt(d_csv, delimiter=',') if d_csv is not None else None
+
+        # Initialize system variables x, x_dot, u, y
+        # A should be a square matrix
+        assert self.A.ndim == 2 and self.A.shape[0] == self.A.shape[1]
+        # A and B should have same number of rows
+        assert self.B.shape[0] == self.A.shape[0]
+
+        self.x = np.genfromtxt(xi_csv, delimiter=',')
+        assert self.x.shape[0] == self.A.shape[0]
+        self.x_dot = np.zeros(self.x.shape[0])
+
+        # Same number of controls as the number of columns of B
+        self.u = np.zeros(self.B.shape[1])
+
+        # Same number of outputs as the number of rows of C
+        assert self.C.ndim == 2 and self.x.shape[0] == self.C.shape[1]
+        self.y = np.zeros(self.C.shape[0])
+
+        if self.D is not None:
+            assert self.D.ndim == 2 and self.x.shape[0] == self.D.shape[0]
+            assert self.u.shape[0] == self.D.shape[1]
+
+    def step(self, x, time, u, step_len=1):
+        """
+        Simulate the system through 1 time step
+        :return: New state of the system as a numpy array
+        """
+
 
 
 def step_system(current_state, time, controls, step_len=1):
