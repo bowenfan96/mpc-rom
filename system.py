@@ -39,13 +39,35 @@ class System:
             assert self.D.ndim == 2 and self.x.shape[0] == self.D.shape[0]
             assert self.u.shape[0] == self.D.shape[1]
 
-    def step(self, x, time, u, step_len=1):
+    def step_casadi(self):
         """
-        Simulate the system through 1 time step
+        Simulate the system using Casadi through 1 time step
         :return: New state of the system as a numpy array
-
         """
+        x = casadi.MX.sym('x', self.x.size)
+        rhs = self.A
+        ode = {'x': x, 'ode': rhs}
+        F = casadi.integrator('F', 'cvodes', ode, {'tf': 5})
 
+        res = F(x0=self.x)
+
+        print(res['xf'])
+
+    def step_scipy(self):
+        """
+        Simulate the system using scipy integrator
+        :return:
+        """
+        def model(t, x):
+            x_dot = np.dot(self.A, x)
+            return x_dot
+
+        system = scipy.integrate.ode(model)
+        system.set_integrator('lsoda')
+        system.set_initial_value(self.x, t0)
+
+        new_state = np.array(system.integrate(system.t + step_len))
+        return new_state
 
 
 def step_system(current_state, time, controls, step_len=1):
