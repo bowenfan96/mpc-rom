@@ -43,6 +43,7 @@ class System:
         """
         Simulate the system through 1 time step
         :return: New state of the system as a numpy array
+
         """
 
 
