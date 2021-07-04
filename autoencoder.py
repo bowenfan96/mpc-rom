@@ -117,7 +117,7 @@ class Autoencoder():
             self.num_epoch = 2000
             self.batch_size = 5
             self.learning_rate = 0.05
-            self.reduced_dim_size = 5
+            self.reduced_dim_size = 30
             self.is_tuning = False
 
         # Initialise parameters
@@ -160,8 +160,8 @@ class Autoencoder():
         # Train the neural network
         for epoch in range(self.num_epoch):
 
-            # Full dataset gradient descent (for debugging only, poor accuracy)
-            # output = self.net(data)
+            # Full dataset gradient descent
+            # output = self.autoencoder(data)
             # loss = criterion(output, data)
             # loss.backward()
             # optimizer.step()
