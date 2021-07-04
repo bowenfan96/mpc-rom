@@ -47,27 +47,58 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn import preprocessing
 
-class Net(nn.Module):
+# Neural net structure:
+# Encoder: Full model - Intermediate - Reduced
+# Decoder: Reduced - Intermediate - Full
 
-    def __init__(self, input_size, hidden_size):
-        super(Net, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        # Size of output is same as input
-        self.fc2 = nn.Linear(hidden_size, input_size)
 
-        nn.init.kaiming_uniform_(self.fc1.weight)
-        nn.init.kaiming_uniform_(self.fc2.weight)
+class Encoder(nn.Module):
+    def __init__(self, model_dim, reduced_dim):
+        super(Encoder, self).__init__()
+        self.layer1 = nn.Linear(model_dim, (model_dim + reduced_dim) // 2)
+        self.layer2 = nn.Linear((model_dim + reduced_dim) // 2, reduced_dim)
 
-    def forward(self, data):
-        # Input to hidden activation
-        data = F.leaky_relu(self.fc1(data))
-        # Hidden to output - no activation
-        data = self.fc2(data)
-        return data
+        nn.init.kaiming_uniform_(self.layer1.weight)
+        nn.init.kaiming_uniform_(self.layer2.weight)
+
+    def forward(self, x_in):
+        # x_in = torch.flatten(data, start_dim=1)
+        # Input to intermediate layer activation
+        x_layer1 = F.leaky_relu(self.layer1(x_in))
+        # Intermediate to compressed layer - no activation
+        x_rom = self.layer2(x_layer1)
+        return x_rom
+
+
+class Decoder(nn.Module):
+    def __init__(self, model_dim, reduced_dim):
+        super(Decoder, self).__init__()
+        self.layer3 = nn.Linear(reduced_dim, (model_dim + reduced_dim) // 2)
+        self.layer4 = nn.Linear((model_dim + reduced_dim) // 2, model_dim)
+
+        nn.init.kaiming_uniform_(self.layer3.weight)
+        nn.init.kaiming_uniform_(self.layer4.weight)
+
+    def forward(self, x_rom):
+        x_layer3 = F.leaky_relu(self.layer3(x_rom))
+        x_out = torch.sigmoid(self.layer4(x_layer3))
+        return x_out
+
+
+class Wrapper(nn.Module):
+    def __init__(self, model_dim, reduced_dim):
+        super(Wrapper, self).__init__()
+        self.encoder = Encoder(model_dim, reduced_dim)
+        self.decoder = Decoder(model_dim, reduced_dim)
+
+    def forward(self, x_in):
+        x_rom = self.encoder(x_in)
+        x_out = self.decoder(x_rom)
+        return x_out
 
 
 class Autoencoder():
-    def __init__(self, data, num_epoch=1000, config=None):
+    def __init__(self, data, config=None):
         super(Autoencoder, self).__init__()
 
         # Hyperparameters
@@ -76,27 +107,30 @@ class Autoencoder():
             self.batch_size = config["batch_size"]
             self.learning_rate = config["learning_rate"]
 
-            # Minimize hidden size (this is a hyperparameter?)
-            self.hidden_size = config["hidden_size"]
-            # We report loss on validation dataset to RayTune if we are in tuning mode
+            # Desired dimension of reduced model
+            self.reduced_dim_size = config["reduced_dim"]
+            # We report loss on validation data to RayTune if we are in tuning mode
             self.is_tuning = True
 
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
-            self.num_epoch = num_epoch
-            self.batch_size = 6
-            self.learning_rate = 0.049
-            self.hidden_size = 2
+            self.num_epoch = 2000
+            self.batch_size = 5
+            self.learning_rate = 0.05
+            self.reduced_dim_size = 5
             self.is_tuning = False
 
         # Initialise parameters
         processed_data = self.process_data(data)
 
         # Input size is the same as output size
-        self.input_size = processed_data.shape[1]
+        self.model_dim = processed_data.shape[1]
 
-        # Initialise neural network
-        self.net = Net(self.input_size, self.hidden_size)
+        print(self.model_dim)
+        print(self.reduced_dim_size)
+
+        # Initialise autoencoder neural net
+        self.autoencoder = Wrapper(self.model_dim, self.reduced_dim_size)
 
         return
 
@@ -111,14 +145,14 @@ class Autoencoder():
         data = self.process_data(data)
 
         # Set model to training model so gradients are updated
-        self.net.train()
+        self.autoencoder.train()
 
         # Wrap the tensors into a dataset, then load the data
         # data = torch.utils.data.TensorDataset(data)
         data_loader = torch.utils.data.DataLoader(data, batch_size=self.batch_size)
 
         # Create optimizer to use update rules
-        optimizer = optim.SGD(self.net.parameters(), lr=self.learning_rate)
+        optimizer = optim.SGD(self.autoencoder.parameters(), lr=self.learning_rate)
 
         # Specify criterion used
         criterion = nn.MSELoss()
@@ -135,7 +169,7 @@ class Autoencoder():
 
             # Minibatch gradient descent
             for minibatch_data in data_loader:
-                output = self.net(minibatch_data)
+                output = self.autoencoder(minibatch_data)
                 loss = criterion(output, minibatch_data)
                 loss.backward()
                 optimizer.step()
@@ -143,7 +177,7 @@ class Autoencoder():
 
             # Test entire dataset at this epoch
             with torch.no_grad():
-                output = self.net(data)
+                output = self.autoencoder(data)
                 loss = criterion(output, data)
 
             # Print loss
@@ -153,14 +187,14 @@ class Autoencoder():
 
 
 def autoencoder_train():
-    data = pd.read_csv("data.csv", sep=' ')
+    data = pd.read_csv("A.csv", sep=',')
 
-    autoencoder = Autoencoder(data, num_epoch=1000)
+    autoencoder = Autoencoder(data)
 
     autoencoder.fit(data)
 
     # Print a model.summary to show hidden layer information
-    summary(autoencoder.net.to("cpu"), verbose=2)
+    summary(autoencoder.autoencoder.to("cpu"), verbose=2)
 
 # def autoencoder_test():
 
