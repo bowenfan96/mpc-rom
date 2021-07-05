@@ -44,10 +44,19 @@ class System:
         Simulate the system using Casadi through 1 time step
         :return: New state of the system as a numpy array
         """
+
         x = casadi.MX.sym('x', self.x.size)
-        rhs = self.A
+        A = casadi.MX(self.A)
+
+        rhs = A*x
+        print(rhs)
+        print(x.shape)
+        print(rhs.shape)
+
         ode = {'x': x, 'ode': rhs}
         F = casadi.integrator('F', 'cvodes', ode, {'tf': 5})
+
+
 
         res = F(x0=self.x)
 
@@ -64,10 +73,10 @@ class System:
 
         system = scipy.integrate.ode(model)
         system.set_integrator('lsoda')
-        system.set_initial_value(self.x, t0)
+        # system.set_initial_value(self.x, t0)
 
-        new_state = np.array(system.integrate(system.t + step_len))
-        return new_state
+        # new_state = np.array(system.integrate(system.t + step_len))
+        # return new_state
 
 
 def step_system(current_state, time, controls, step_len=1):
@@ -127,4 +136,7 @@ def simulate_and_get_data(duration):
 
 
 if __name__ == "__main__":
-    simulate_and_get_data(100)
+    # simulate_and_get_data(100)
+
+    system = System("xi.csv", "A.csv", "B.csv", "C.csv")
+    system.step_casadi()
