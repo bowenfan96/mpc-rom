@@ -14,10 +14,10 @@ def generate_model():
     global A, B, C, D
 
     while not controllable or not observable:
-        A = numpy.random.uniform(-1, 1, size=(30, 30))
-        B = numpy.random.uniform(-2, 2, size=(30, 5))
-        C = numpy.random.uniform(-1, 1, size=(5, 30))
-        D = numpy.random.uniform(-2, 2, size=(5, 5))
+        A = numpy.random.randint(-10, 10, size=(5, 5))
+        B = numpy.random.randint(-20, 20, size=(5, 2))
+        C = numpy.random.randint(-10, 10, size=(1, 5))
+        D = numpy.random.randint(-20, 20, size=(2, 1))
 
         ctrb = control.ctrb(A, B)
         obsv = control.obsv(A, C)
@@ -36,7 +36,4 @@ def generate_model():
 
         print(ctrl_rank, obsv_rank)
 
-system = control.ss(A, B, C, D)
-rom = control.balred(system, 10, method='truncate')
-
-print(rom)
+generate_model()
