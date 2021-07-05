@@ -6,7 +6,6 @@ import casadi
 
 
 class System:
-
     def __init__(self, xi_csv, a_csv, b_csv, c_csv, d_csv=None):
         """
         Initialize a linear system model using A, B, C, D matrices:
@@ -47,6 +46,8 @@ class System:
         """
 
         x = casadi.MX.sym('x', self.x.size)
+
+        # TODO: fix symbolic generator
         A = casadi.MX(self.A)
 
         rhs = A*x

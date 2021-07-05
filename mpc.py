@@ -11,6 +11,43 @@ import numpy as np
 import pandas as pd
 
 
+class MPC:
+    def __init__(self, xi_csv, a_csv, b_csv, duration):
+        """
+        x_dot = Ax + Bu
+        :param xi_csv: Initial system state
+        :param a_csv: Matrix A as a csv file
+        :param b_csv: Matrix B as a csv file
+        :param duration: Number of time steps
+        """
+
+        self.A = np.genfromtxt(a_csv, delimiter=',')
+        self.B = np.genfromtxt(b_csv, delimiter=',')
+        # A should be a square matrix
+        assert self.A.ndim == 2 and self.A.shape[0] == self.A.shape[1]
+        # A and B should have same number of rows
+        assert self.B.shape[0] == self.A.shape[0]
+
+        self.x = np.genfromtxt(xi_csv, delimiter=',')
+        assert self.x.shape[0] == self.A.shape[0]
+
+        # Initialize pyomo model
+        self.model = ConcreteModel()
+
+        self.model.time = ContinuousSet(bounds=(0, duration))
+
+        self.model.I = RangeSet(1, self.x.size)
+        self.model.x = Var(self.model.I, self.model.t)
+        self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time)
+
+        self.model.ode = ConstraintList()
+        for i in range(self.A.shape[0]):
+            self.model.ode.add(
+                self.model.x_dot[i] == self.A[i][j] * self.model.x[j] for j in self.A.shape[1]
+            )
+
+
+
 # Define a concrete model with hardcoded dynamics
 model = ConcreteModel()
 # Define the set of continuous time
