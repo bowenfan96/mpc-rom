@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import scipy.integrate
 import matplotlib.pyplot as plt
 import casadi
@@ -56,8 +57,6 @@ class System:
         ode = {'x': x, 'ode': rhs}
         F = casadi.integrator('F', 'cvodes', ode, {'tf': 5})
 
-
-
         res = F(x0=self.x)
 
         print(res['xf'])
@@ -71,12 +70,64 @@ class System:
             x_dot = np.dot(self.A, x)
             return x_dot
 
-        system = scipy.integrate.ode(model)
-        system.set_integrator('lsoda')
-        # system.set_initial_value(self.x, t0)
+        sys = scipy.integrate.ode(model)
+        sys.set_integrator('lsoda')
+        sys.set_initial_value(self.x, t=0)
 
-        # new_state = np.array(system.integrate(system.t + step_len))
-        # return new_state
+        self.x = np.array(sys.integrate(sys.t + 1))
+        return self.x
+
+    def simulate(self, duration, integrator="scipy"):
+        """
+        Simulate the system and plot
+        :param duration: Duration (number of time steps)
+        :param integrator: "scipy" or "casadi"
+        :return: Simulated system state over the duration (sst)
+        """
+        # System state through time
+        sst = []
+        sst.append(self.x)
+        for time in range(duration):
+            if integrator == "scipy":
+                self.x = self.step_scipy()
+            elif integrator == "casadi":
+                self.x = self.step_casadi()
+            sst.append(self.x)
+
+        sst = np.array(sst)
+        np.savetxt('sst.csv', sst, delimiter=',')
+
+        return sst
+
+    @staticmethod
+    def plot(sst):
+        assert sst.ndim == 2
+        for i in range(sst.shape[1]):
+            plt.plot(sst[:, i], label='x{}'.format(i))
+
+        plt.xlabel("Time")
+        plt.legend()
+        plt.savefig("plot.svg", format="svg")
+        plt.show()
+
+
+
+
+
+if __name__ == "__main__":
+    # simulate_and_get_data(10)
+
+    system = System("xi.csv", "A.csv", "B.csv", "C.csv")
+    system.plot(system.simulate(100))
+
+
+
+
+
+
+
+
+
 
 
 def step_system(current_state, time, controls, step_len=1):
@@ -133,10 +184,3 @@ def simulate_and_get_data(duration):
     plt.legend()
     plt.savefig("plot.svg", format="svg")
     plt.show()
-
-
-if __name__ == "__main__":
-    # simulate_and_get_data(100)
-
-    system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    system.step_casadi()
