@@ -41,32 +41,35 @@ class MPC:
 
         self.model.time = ContinuousSet(bounds=(0, duration))
 
-        self.model.I = RangeSet(1, self.x.size)
-        self.model.x = Var(self.model.I, self.model.time)
-        self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time)
-
-        # Define derivative variables
-        self.model.ode = ConstraintList()
-        for i in range(self.A.shape[0]):
-            self.model.ode.add(
-                self.model.x_dot[i] == self.A[i][j] * self.model.x[j] for j in range(self.A.shape[1])
-            )
+        self.model.I = RangeSet(0, self.x.size)
+        self.model.x = Var(self.model.I, self.model.time, initialize=0)
+        self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
 
         self.discretizer = TransformationFactory('dae.finite_difference')
         self.discretizer.apply_to(self.model, nfe=int(duration), wrt=self.model.time, scheme='BACKWARD')
 
-        # Fix variables based on initial values
-        for i in self.model.I:
-            self.model.x[i][0].fix(self.x[i])
+        self.model.display()
+
+        # Define derivative variables
+        self.model.ode = ConstraintList()
+        for time in self.model.time:
+            for i in range(self.A.shape[0]):
+                print(time, i)
+                self.model.ode.add(
+                    self.model.x_dot[i, time] == sum(self.model.x[j, time] * self.A[i][j] for j in range(self.A.shape[0]))
+                )
+
+                # Fix variables based on initial values
+                self.model.x[i, 0].fix(self.x[i])
 
         # Objective: Bring to zero
         self.model.obj = Objective(
-            expr=(summation(self.model.x) - 0)**2,
+            expr=summation(self.model.x),
             sense=minimize
         )
 
     def solve(self):
-        opt = SolverFactory('ipopt', tee=True)
+        opt = SolverFactory('glpk', tee=True)
         opt.options['max_iter'] = 1000
 
         mpc_state = []
