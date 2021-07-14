@@ -91,7 +91,7 @@ class MPC:
             opt.solve(self.model)
             mpc_state.append(self.model.x[:, time])
 
-            self.x = sys.simulate(1)
+            self.x = sys.simulate(duration=1)
             self.x.flatten()
             print(self.x)
             sys_state.append(self.x)

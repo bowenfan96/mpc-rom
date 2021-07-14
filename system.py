@@ -40,7 +40,7 @@ class System:
             assert self.D.ndim == 2 and self.x.shape[0] == self.D.shape[0]
             assert self.u.shape[0] == self.D.shape[1]
 
-    def step_casadi(self):
+    def step_casadi(self, mpc=True):
         """
         Simulate the system using Casadi through 1 time step
         :return: New state of the system as a numpy array
@@ -63,19 +63,24 @@ class System:
 
         print(res['xf'])
 
-    def step_scipy(self):
+    def step_scipy(self, mpc=True):
         """
         Simulate the system using scipy integrator
         :return:
         """
         def model(t, xu):
-            print(xu)
-            x = xu[0]
-            u = xu[1]
-            print(np.matmul(self.A, xu))
-            print(np.matmul(self.B, xu))
-            x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u))
-            return x_dot
+            if mpc:
+                print(xu)
+                x = xu[0]
+                u = xu[1]
+                print(np.matmul(self.A, xu))
+                print(np.matmul(self.B, xu))
+                x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u))
+                return x_dot
+            else:
+                x = xu
+                x_dot = np.matmul(self.A, x)
+                return x_dot
 
         sys = scipy.integrate.ode(model)
         sys.set_integrator('lsoda')
@@ -84,11 +89,12 @@ class System:
         self.x = np.array(sys.integrate(sys.t + 1))
         return self.x
 
-    def simulate(self, duration, integrator="scipy"):
+    def simulate(self, duration, integrator="scipy", called_by_mpc=True):
         """
         Simulate the system and plot
         :param duration: Duration (number of time steps)
         :param integrator: "scipy" or "casadi"
+        :param called_by_mpc: Whether the simulator is called by a controller with u
         :return: Simulated system state over the duration (sst)
         """
         # System state through time
