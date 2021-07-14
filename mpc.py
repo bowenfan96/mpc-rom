@@ -97,8 +97,7 @@ class MPC:
             sys_state.append(self.x)
 
             for i in self.model.I:
-                print(i)
-                print(time)
+                print("Time: {}, x_i: {}".format(time, i))
                 self.model.x[i, time].fix(self.x[0][i])
 
         return mpc_state, sys_state, mpc_action

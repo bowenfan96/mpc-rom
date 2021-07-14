@@ -120,7 +120,7 @@ if __name__ == "__main__":
     # simulate_and_get_data(10)
 
     system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    system.plot(system.simulate(100))
+    system.plot(system.simulate(2))
 
 
 
