@@ -88,7 +88,7 @@ class System:
         """
         # System state through time
         sst = []
-        sst.append(self.x)
+        # sst.append(self.x)
         for time in range(duration):
             if integrator == "scipy":
                 self.x = self.step_scipy()

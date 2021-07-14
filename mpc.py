@@ -35,13 +35,15 @@ class MPC:
 
         self.x = np.genfromtxt(xi_csv, delimiter=',')
         assert self.x.shape[0] == self.A.shape[0]
+        self.x.flatten()
 
         # Initialize pyomo model
         self.model = ConcreteModel()
 
         self.model.time = ContinuousSet(bounds=(0, duration))
 
-        self.model.I = RangeSet(0, self.A.shape[0])
+        self.model.I = RangeSet(0, self.A.shape[1]-1)
+        self.model.J = RangeSet(0, self.B.shape[1]-1)
         self.model.x = Var(self.model.I, self.model.time, initialize=0)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
 
@@ -53,18 +55,18 @@ class MPC:
         self.model.display()
 
         # Define derivative variables
-        def ode_Ax(model, i):
-            return sum(self.model.x[j, time] * self.A[i][j] for j in range(self.A.shape[0]))
+        def ode_Ax(i):
+            return sum((self.model.x[i, time] * self.A[i][j]) for j in range(self.A.shape[1]))
 
-        def ode_Bu(model, i):
-            return sum(self.model.u[j, time] * self.B[i][j] for j in range(self.B.shape[0]))
+        def ode_Bu(i):
+            return sum((self.model.u[i, time] * self.B[i][j]) for j in range(self.B.shape[1]))
 
         self.model.ode = ConstraintList()
         for time in self.model.time:
             for i in range(self.A.shape[0]):
                 print(time, i)
                 self.model.ode.add(
-                    self.model.x_dot[i, time] == ode_Ax(self.model, i) + ode_Bu(self.model, i)
+                    self.model.x_dot[i, time] == ode_Ax(i) + ode_Bu(i)
                 )
                 # Fix variables based on initial values
                 self.model.x[i, 0].fix(self.x[i])
@@ -77,7 +79,6 @@ class MPC:
 
     def solve(self):
         opt = SolverFactory('glpk', tee=True)
-        opt.options['max_iter'] = 1000
 
         mpc_state = []
         sys_state = []
@@ -88,13 +89,17 @@ class MPC:
         for time in self.model.time:
             # MPC solver
             opt.solve(self.model)
-            mpc_state.append(self.model.x[time])
+            mpc_state.append(self.model.x[:, time])
 
             self.x = sys.simulate(1)
+            self.x.flatten()
+            print(self.x)
             sys_state.append(self.x)
 
             for i in self.model.I:
-                self.model.x[i][time].fix(self.x[i])
+                print(i)
+                print(time)
+                self.model.x[i, time].fix(self.x[0][i])
 
         return mpc_state, sys_state, mpc_action
 
