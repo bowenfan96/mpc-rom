@@ -41,9 +41,11 @@ class MPC:
 
         self.model.time = ContinuousSet(bounds=(0, duration))
 
-        self.model.I = RangeSet(0, self.x.size)
+        self.model.I = RangeSet(0, self.A.shape[0])
         self.model.x = Var(self.model.I, self.model.time, initialize=0)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
+
+        self.model.u = Var(self.model.I, self.model.time, initialize=0)
 
         self.discretizer = TransformationFactory('dae.finite_difference')
         self.discretizer.apply_to(self.model, nfe=int(duration), wrt=self.model.time, scheme='BACKWARD')
@@ -51,14 +53,19 @@ class MPC:
         self.model.display()
 
         # Define derivative variables
+        def ode_Ax(model, i):
+            return sum(self.model.x[j, time] * self.A[i][j] for j in range(self.A.shape[0]))
+
+        def ode_Bu(model, i):
+            return sum(self.model.u[j, time] * self.B[i][j] for j in range(self.B.shape[0]))
+
         self.model.ode = ConstraintList()
         for time in self.model.time:
             for i in range(self.A.shape[0]):
                 print(time, i)
                 self.model.ode.add(
-                    self.model.x_dot[i, time] == sum(self.model.x[j, time] * self.A[i][j] for j in range(self.A.shape[0]))
+                    self.model.x_dot[i, time] == ode_Ax(self.model, i) + ode_Bu(self.model, i)
                 )
-
                 # Fix variables based on initial values
                 self.model.x[i, 0].fix(self.x[i])
 
