@@ -68,8 +68,13 @@ class System:
         Simulate the system using scipy integrator
         :return:
         """
-        def model(t, x):
-            x_dot = np.dot(self.A, x)
+        def model(t, xu):
+            print(xu)
+            x = xu[0]
+            u = xu[1]
+            print(np.matmul(self.A, xu))
+            print(np.matmul(self.B, xu))
+            x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u))
             return x_dot
 
         sys = scipy.integrate.ode(model)
