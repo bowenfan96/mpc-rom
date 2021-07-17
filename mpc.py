@@ -90,7 +90,11 @@ class MPC:
             # MPC solver
             opt.solve(self.model)
             mpc_state.append(list(value(self.model.x[:, time])))
-            controls = self.model.u[:, time]
+
+            # Send these controls to system
+            controls = list(value(self.model.u[:, time]))
+
+            mpc_action.append(controls)
 
             self.model.display()
 
@@ -102,8 +106,11 @@ class MPC:
                 print("Time: {}, x_i: {}".format(time, i))
                 self.model.x[i, time].fix(self.x[0][i])
 
-        # Turn lists in numpy arrays
+        # Turn lists into numpy arrays
         mpc_state = np.array(mpc_state)
+
+        mpc_action = np.array(mpc_action)
+
         return mpc_state, sys_state, mpc_action
 
     @staticmethod
@@ -121,61 +128,3 @@ if __name__ == "__main__":
     mpc = MPC("xi.csv", "A.csv", "B.csv", 5)
     mpc_state, sys_state, mpc_action = mpc.solve()
     mpc.plot(mpc_state, sys_state, mpc_action)
-
-
-
-
-
-
-# for time in model.time:
-#     opt.solve(model)
-#
-#     current_state = [value(model.x1[time]), value(model.x2[time]), value(model.x3[time])]
-#     controls = [value(model.u[time])]
-#     new_state = system.step_system(current_state, time, controls, 1)
-#
-#     mpc_x1_plot.append(value(model.x1[time]))
-#     mpc_x2_plot.append(value(model.x2[time]))
-#     mpc_x3_plot.append(value(model.x3[time]))
-#     mpc_u_plot.append(value(model.u[time]))
-#
-#     if time == 0:
-#         sys_x1_plot.append(value(model.x1[time]))
-#         sys_x2_plot.append(value(model.x2[time]))
-#         sys_x3_plot.append(value(model.x3[time]))
-#
-#     elif time < len(model.time):
-#         sys_x1_plot.append(new_state[0])
-#         sys_x2_plot.append(new_state[1])
-#         sys_x3_plot.append(new_state[2])
-#
-#     # Record system and controller state and fix new state from simulated system
-#     # step = 1
-#     # if time < len(model.time):
-#     #     model.x1[time + step].fix(new_state[0])
-#     #     model.x2[time + step].fix(new_state[1])
-#     #     model.x3[time + step].fix(new_state[2])
-#
-#     print('Time: ', time)
-#     print("MPC")
-#     print("x1: ", value(model.x1[time]), "\tx2: ", value(model.x2[time]),
-#           "\tx3: ", value(model.x3[time]), "\tu: ", value(model.u[time]))
-#     print("System")
-#     print("x1: ", sys_x1_plot[int(time)], "\tx2: ", sys_x2_plot[int(time)], "\tx3", sys_x3_plot[int(time)])
-#
-# plt.plot(model.time, mpc_x1_plot, label='mpc_x1')
-# plt.plot(model.time, mpc_x2_plot, label='mpc_x2')
-# plt.plot(model.time, mpc_x3_plot, label='mpc_x3')
-# plt.plot(model.time, mpc_u_plot, label='mpc_u')
-#
-# plt.plot(model.time, sys_x1_plot, label='sys_x1')
-# plt.plot(model.time, sys_x2_plot, label='sys_x2')
-# plt.plot(model.time, sys_x3_plot, label='sys_x3')
-#
-# plt.xlabel("Time")
-# plt.legend()
-# plt.savefig("plot.svg", format="svg")
-# plt.show()
-#
-# system_data = pd.DataFrame(zip(sys_x1_plot, sys_x2_plot, sys_x3_plot))
-# system_data.to_csv("data.csv")
