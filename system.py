@@ -40,7 +40,7 @@ class System:
             assert self.D.ndim == 2 and self.x.shape[0] == self.D.shape[0]
             assert self.u.shape[0] == self.D.shape[1]
 
-    def step_casadi(self, mpc=True):
+    def step_casadi(self, controls=None):
         """
         Simulate the system using Casadi through 1 time step
         :return: New state of the system as a numpy array
@@ -63,13 +63,13 @@ class System:
 
         print(res['xf'])
 
-    def step_scipy(self, mpc=True):
+    def step_scipy(self, controls=None):
         """
         Simulate the system using scipy integrator
         :return:
         """
         def model(t, xu):
-            if mpc:
+            if controls is not None:
                 print(xu)
                 x = xu[0]
                 u = xu[1]
@@ -89,12 +89,12 @@ class System:
         self.x = np.array(sys.integrate(sys.t + 1))
         return self.x
 
-    def simulate(self, duration, integrator="scipy", called_by_mpc=True):
+    def simulate(self, duration, integrator="scipy", controls=None):
         """
         Simulate the system and plot
         :param duration: Duration (number of time steps)
         :param integrator: "scipy" or "casadi"
-        :param called_by_mpc: Whether the simulator is called by a controller with u
+        :param controls: Control signals
         :return: Simulated system state over the duration (sst)
         """
         # System state through time
@@ -102,9 +102,9 @@ class System:
         # sst.append(self.x)
         for time in range(duration):
             if integrator == "scipy":
-                self.x = self.step_scipy()
+                self.x = self.step_scipy(controls if controls is not None else None)
             elif integrator == "casadi":
-                self.x = self.step_casadi()
+                self.x = self.step_casadi(controls if controls is not None else None)
             sst.append(self.x)
 
         sst = np.array(sst)

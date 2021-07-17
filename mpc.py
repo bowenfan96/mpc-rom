@@ -24,7 +24,7 @@ class MPC:
         self.xi_csv = xi_csv
         self.a_csv = a_csv
         self.b_csv = b_csv
-        self.duration = duration
+        self.duration = duration-1
 
         self.A = np.genfromtxt(a_csv, delimiter=',')
         self.B = np.genfromtxt(b_csv, delimiter=',')
@@ -40,7 +40,7 @@ class MPC:
         # Initialize pyomo model
         self.model = ConcreteModel()
 
-        self.model.time = ContinuousSet(bounds=(0, duration))
+        self.model.time = ContinuousSet(bounds=(0, self.duration))
 
         self.model.I = RangeSet(0, self.A.shape[1]-1)
         self.model.J = RangeSet(0, self.B.shape[1]-1)
@@ -50,35 +50,35 @@ class MPC:
         self.model.u = Var(self.model.I, self.model.time, initialize=0)
 
         self.discretizer = TransformationFactory('dae.finite_difference')
-        self.discretizer.apply_to(self.model, nfe=int(duration), wrt=self.model.time, scheme='BACKWARD')
-
-        self.model.display()
+        self.discretizer.apply_to(self.model, nfe=int(self.duration), wrt=self.model.time, scheme='BACKWARD')
 
         # Define derivative variables
-        def ode_Ax(i):
-            return sum((self.model.x[i, time] * self.A[i][j]) for j in range(self.A.shape[1]))
+        def ode_Ax(m, i, t):
+            return sum((m.x[i, t] * self.A[i][j]) for j in range(self.A.shape[1]))
 
-        def ode_Bu(i):
-            return sum((self.model.u[i, time] * self.B[i][j]) for j in range(self.B.shape[1]))
+        def ode_Bu(m, i, t):
+            return sum((m.u[i, t] * self.B[i][j]) for j in range(self.B.shape[1]))
 
         self.model.ode = ConstraintList()
         for time in self.model.time:
             for i in range(self.A.shape[0]):
                 print(time, i)
                 self.model.ode.add(
-                    self.model.x_dot[i, time] == ode_Ax(i) + ode_Bu(i)
+                    self.model.x_dot[i, time] == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
                 )
                 # Fix variables based on initial values
                 self.model.x[i, 0].fix(self.x[i])
 
+        self.model.ode.display()
+
         # Objective: Bring to zero
         self.model.obj = Objective(
-            expr=summation(self.model.x),
+            expr=sum((self.model.x[0, t] - 100)**2 for t in self.model.time),
             sense=minimize
         )
 
     def solve(self):
-        opt = SolverFactory('glpk', tee=True)
+        opt = SolverFactory('ipopt', tee=True)
 
         mpc_state = []
         sys_state = []
@@ -90,10 +90,12 @@ class MPC:
             # MPC solver
             opt.solve(self.model)
             mpc_state.append(self.model.x[:, time])
+            controls = self.model.u[:, time]
+
+            self.model.display()
 
             self.x = sys.simulate(duration=1)
             self.x.flatten()
-            print(self.x)
             sys_state.append(self.x)
 
             for i in self.model.I:
@@ -114,7 +116,7 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC("xi.csv", "A.csv", "B.csv", 100)
+    mpc = MPC("xi.csv", "A.csv", "B.csv", 5)
     mpc_state, sys_state, mpc_action = mpc.solve()
     mpc.plot(mpc_state, sys_state, mpc_action)
 
