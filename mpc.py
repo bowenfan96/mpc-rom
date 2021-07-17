@@ -89,7 +89,7 @@ class MPC:
         for time in self.model.time:
             # MPC solver
             opt.solve(self.model)
-            mpc_state.append(self.model.x[:, time])
+            mpc_state.append(np.array(value(self.model.x[:, time])))
             controls = self.model.u[:, time]
 
             self.model.display()
@@ -106,8 +106,9 @@ class MPC:
 
     @staticmethod
     def plot(mpc_state, sys_state, mpc_action):
-        for i in range(mpc_state.shape[1]):
-            plt.plot(mpc_state[:, i], label='x{}'.format(i))
+        for time in range(len(mpc_state)):
+            for i in range(len(mpc_state[0])):
+                plt.plot(mpc_state[time][i], label='x{}'.format(i))
 
         plt.xlabel("Time")
         plt.legend()
