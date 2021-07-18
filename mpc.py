@@ -50,7 +50,7 @@ class MPC:
         self.model.u = Var(self.model.J, self.model.time, initialize=0)
 
         self.discretizer = TransformationFactory('dae.finite_difference')
-        self.discretizer.apply_to(self.model, nfe=int(self.duration), wrt=self.model.time, scheme='BACKWARD')
+        self.discretizer.apply_to(self.model, nfe=int(self.duration)*20, wrt=self.model.time, scheme='BACKWARD')
 
         # Define derivative variables
         def ode_Ax(m, i, t):
@@ -74,7 +74,7 @@ class MPC:
             sense=minimize
         )
 
-    def solve(self):
+    def solve(self, sim_sys=True):
         opt = SolverFactory('ipopt', tee=True)
         results = None
 
@@ -82,29 +82,37 @@ class MPC:
         sys_state = []
         mpc_action = []
 
-        sys = system.System(self.xi_csv, self.a_csv, self.b_csv)
+        if sim_sys:
+            sys = system.System(self.xi_csv, self.a_csv, self.b_csv)
 
-        for time in self.model.time:
-            # MPC solver
-            print("Solving...")
+            for time in self.model.time:
+                # MPC solver
+                print("Solving...")
+                results = opt.solve(self.model)
+                mpc_state.append(list(value(self.model.x[:, time])))
+
+                # Send these controls to system
+                controls = list(value(self.model.u[:, time]))
+
+                mpc_action.append(controls)
+
+                self.x = np.array(sys.simulate(duration=1, controls=controls))
+                self.x = self.x.flatten()
+
+                # self.model.display()
+
+                sys_state.append(self.x)
+
+                # for i in self.model.I:
+                #     print("Time: {}, x_{}: {}".format(time, i, self.x[i]))
+                #     self.model.x[i, time].fix(self.x[i])
+
+        else:
             results = opt.solve(self.model)
-            mpc_state.append(list(value(self.model.x[:, time])))
-
-            # Send these controls to system
-            controls = list(value(self.model.u[:, time]))
-
-            mpc_action.append(controls)
-
-            self.x = np.array(sys.simulate(duration=1, controls=controls))
-            self.x = self.x.flatten()
-
             self.model.display()
-
-            sys_state.append(self.x)
-
-            for i in self.model.I:
-                print("Time: {}, x_i: {}".format(time, i))
-                # self.model.x[i, time].fix(self.x[0][i])
+            for time in self.model.time:
+                mpc_state.append(list(value(self.model.x[:, time])))
+                mpc_action.append(list(value(self.model.u[:, time])))
 
         # Output error if solution cannot be found
         print(results.solver.status)
@@ -116,8 +124,7 @@ class MPC:
 
         return mpc_state, sys_state, mpc_action
 
-    @staticmethod
-    def plot(mpc_state, sys_state, mpc_action):
+    def plot(self, mpc_state, sys_state, mpc_action):
         for i in range(len(mpc_state[0])):
             plt.plot(mpc_state[:, i], label='mpc_x{}'.format(i))
             # plt.plot(sys_state[:, i], label='sys_x{}'.format(i))
@@ -132,6 +139,6 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC("xi.csv", "A.csv", "B.csv", 20)
-    mpc_state, sys_state, mpc_action = mpc.solve()
+    mpc = MPC("xi.csv", "A.csv", "B.csv", 5)
+    mpc_state, sys_state, mpc_action = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state, sys_state, mpc_action)

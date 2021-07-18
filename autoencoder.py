@@ -1,34 +1,3 @@
-# From Panos:
-# class Encoder(nn.Module):
-#     def __init__(self, latent_dims):
-#         super(Encoder, self).__init__()
-#         self.linear1 = nn.Linear(#, #)
-#         self.linear2 = nn.Linear(#, latent_dims)
-#     def forward(self, x):
-#         x = torch.flatten(x, start_dim=1)
-#         x = F.relu(self.linear1(x))
-#         return self.linear2(x)
-# class Decoder(nn.Module):
-#     def __init__(self, latent_dims):
-#         super(Decoder, self).__init__()
-#         self.linear1 = nn.Linear(latent_dims, #)
-#         self.linear2 = nn.Linear(#, #)
-#     def forward(self, z):
-#         z = F.relu(self.linear1(z))
-#         z = torch.sigmoid(self.linear2(z))
-#         return z.reshape((-1, 1, #, #))
-
-# class Autoencoder(nn.Module):
-#     def __init__(self, latent_dims):
-#         super(Autoencoder, self).__init__()
-#         self.encoder = Encoder(latent_dims)
-#         self.decoder = Decoder(latent_dims)
-#     def forward(self, x):
-#         z = self.encoder(x)
-#         return self.decoder(z)
-
-
-
 import torch
 import torch.nn as nn
 import torch.optim as optim

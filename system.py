@@ -76,21 +76,24 @@ class System:
         def model(t, x, u=None):
             if u is not None:
                 x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u))
-                print(x_dot)
+                # print(x_dot)
                 # time.sleep(1)
                 return x_dot
             else:
                 x_dot = np.matmul(self.A, x)
-                print(x_dot)
+                print("Hi")
+                # print(x_dot)
                 # time.sleep(1)
                 return x_dot
 
         # Model function signature is fun(t, y)
         sys = scipy.integrate.solve_ivp(
-            fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='LSODA', args=u, max_step=1, min_step=1
+            fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='RK45', args=u,
+            # Force the step size to be 1
+            max_step=1, first_step=1, atol=1e99, rtol=1e99
         )
         self.x = np.transpose(sys.y).flatten()
-        print(self.x)
+        # print(self.x)
         # time.sleep(2)
 
         return self.x
