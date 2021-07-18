@@ -98,7 +98,7 @@ class MPC:
 
             self.model.display()
 
-            self.x = sys.simulate(duration=1)
+            self.x = sys.simulate(duration=1, controls=controls)
             self.x.flatten()
             sys_state.append(self.x)
 
@@ -117,6 +117,7 @@ class MPC:
     def plot(mpc_state, sys_state, mpc_action):
         for i in range(len(mpc_state[0])):
             plt.plot(mpc_state[:, i], label='x{}'.format(i))
+            plt.plot(mpc_action[:, i], label='u{}'.format(i))
 
         plt.xlabel("Time")
         plt.legend()

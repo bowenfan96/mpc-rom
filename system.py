@@ -70,7 +70,6 @@ class System:
         """
         def model(t, xu):
             if controls is not None:
-                print(xu)
                 x = xu[0]
                 u = xu[1]
                 print(np.matmul(self.A, xu))
