@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 
+import time
 
 class MPC:
     def __init__(self, xi_csv, a_csv, b_csv, duration):
@@ -47,17 +48,17 @@ class MPC:
         self.model.x = Var(self.model.I, self.model.time, initialize=0)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
 
-        self.model.u = Var(self.model.I, self.model.time, initialize=0)
+        self.model.u = Var(self.model.J, self.model.time, initialize=0)
 
         self.discretizer = TransformationFactory('dae.finite_difference')
         self.discretizer.apply_to(self.model, nfe=int(self.duration), wrt=self.model.time, scheme='BACKWARD')
 
         # Define derivative variables
         def ode_Ax(m, i, t):
-            return sum((m.x[i, t] * self.A[i][j]) for j in range(self.A.shape[1]))
+            return sum((m.x[j, t] * self.A[i][j]) for j in range(self.A.shape[1]))
 
         def ode_Bu(m, i, t):
-            return sum((m.u[i, t] * self.B[i][j]) for j in range(self.B.shape[1]))
+            return sum((m.u[j, t] * self.B[i][j]) for j in range(self.B.shape[1]))
 
         self.model.ode = ConstraintList()
         for time in self.model.time:

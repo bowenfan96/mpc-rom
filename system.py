@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pandas as pd
 import scipy.integrate
@@ -68,24 +70,25 @@ class System:
         Simulate the system using scipy integrator
         :return:
         """
-        def model(t, xu):
-            if controls is not None:
-                x = xu[0]
-                u = xu[1]
-                print(np.matmul(self.A, xu))
-                print(np.matmul(self.B, xu))
+        # Controls should be a numpy array with same size as number of controllers
+        u = (controls,) if controls is not None else None
+
+        def model(t, x, u=None):
+            if u is not None:
+                print(u)
+                time.sleep(1)
+                print(self.B)
+                time.sleep(1)
                 x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u))
                 return x_dot
             else:
-                x = xu
                 x_dot = np.matmul(self.A, x)
                 return x_dot
 
-        sys = scipy.integrate.ode(model)
-        sys.set_integrator('lsoda')
-        sys.set_initial_value(self.x, t=0)
+        # Model function signature is fun(t, y)
+        sys = scipy.integrate.solve_ivp(fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='LSODA', args=u)
+        self.x = np.transpose(sys.y).flatten()
 
-        self.x = np.array(sys.integrate(sys.t + 1))
         return self.x
 
     def simulate(self, duration, integrator="scipy", controls=None):
@@ -123,76 +126,7 @@ class System:
         plt.show()
 
 
-
-
-
 if __name__ == "__main__":
-    # simulate_and_get_data(10)
-
     system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    system.plot(system.simulate(2))
-
-
-
-
-
-
-
-
-
-
-
-def step_system(current_state, time, controls, step_len=1):
-    u = controls[0]
-
-    def model(t, state):
-        x1 = state[0]
-        x2 = state[1]
-        x3 = state[2]
-        x4 = state[3]
-
-        dx1dt = x2
-        dx2dt = -x1
-        dx3dt = 0.9*x2 + 0.1*x1 + 0.03*x3
-        dx4dt = 0.9*x2 + 0.03*x4
-
-        return [dx1dt, dx2dt, dx3dt, dx4dt]
-
-    system = scipy.integrate.ode(model)
-    system.set_integrator('lsoda')
-    system.set_initial_value(current_state, time)
-    new_state = np.array(system.integrate(system.t + step_len))
-    return new_state
-
-
-def simulate_and_get_data(duration):
-    x1_i = 1
-    x2_i = 0
-    x3_i = 0
-    x4_i = 0
-
-    current_state = [x1_i, x2_i, x3_i, x4_i]
-    controls = [0]
-
-    sys_x1_plot = []
-    sys_x2_plot = []
-    sys_x3_plot = []
-    sys_x4_plot = []
-
-    for time in range(duration):
-        sys_x1_plot.append(current_state[0])
-        sys_x2_plot.append(current_state[1])
-        sys_x3_plot.append(current_state[2])
-        sys_x4_plot.append(current_state[3])
-
-        current_state = step_system(current_state, duration, controls, step_len=1)
-
-    plt.plot(range(duration), sys_x1_plot, label='sys_x1')
-    plt.plot(range(duration), sys_x2_plot, label='sys_x2')
-    plt.plot(range(duration), sys_x3_plot, label='sys_x3')
-    plt.plot(range(duration), sys_x4_plot, label='sys_x4')
-
-    plt.xlabel("Time")
-    plt.legend()
-    plt.savefig("plot.svg", format="svg")
-    plt.show()
+    results = system.simulate(10)
+    system.plot(results)
