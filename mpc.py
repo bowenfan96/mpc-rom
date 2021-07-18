@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 
-import time
 
 class MPC:
     def __init__(self, xi_csv, a_csv, b_csv, duration):
@@ -35,8 +34,8 @@ class MPC:
         assert self.B.shape[0] == self.A.shape[0]
 
         self.x = np.genfromtxt(xi_csv, delimiter=',')
+        assert self.x.ndim == 1
         assert self.x.shape[0] == self.A.shape[0]
-        self.x.flatten()
 
         # Initialize pyomo model
         self.model = ConcreteModel()
@@ -63,23 +62,21 @@ class MPC:
         self.model.ode = ConstraintList()
         for time in self.model.time:
             for i in range(self.A.shape[0]):
-                print(time, i)
                 self.model.ode.add(
                     self.model.x_dot[i, time] == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
                 )
                 # Fix variables based on initial values
                 self.model.x[i, 0].fix(self.x[i])
 
-        self.model.ode.display()
-
-        # Objective: Bring to zero
+        # Objective: Bring the entire system to zero
         self.model.obj = Objective(
-            expr=sum((self.model.x[0, t] - 100)**2 for t in self.model.time),
+            expr=(sum(self.model.x[j] for j in self.model.I * self.model.time))**2,
             sense=minimize
         )
 
     def solve(self):
         opt = SolverFactory('ipopt', tee=True)
+        results = None
 
         mpc_state = []
         sys_state = []
@@ -89,7 +86,8 @@ class MPC:
 
         for time in self.model.time:
             # MPC solver
-            opt.solve(self.model)
+            print("Solving...")
+            results = opt.solve(self.model)
             mpc_state.append(list(value(self.model.x[:, time])))
 
             # Send these controls to system
@@ -97,36 +95,43 @@ class MPC:
 
             mpc_action.append(controls)
 
+            self.x = np.array(sys.simulate(duration=1, controls=controls))
+            self.x = self.x.flatten()
+
             self.model.display()
 
-            self.x = sys.simulate(duration=1, controls=controls)
-            self.x.flatten()
             sys_state.append(self.x)
 
             for i in self.model.I:
                 print("Time: {}, x_i: {}".format(time, i))
-                self.model.x[i, time].fix(self.x[0][i])
+                # self.model.x[i, time].fix(self.x[0][i])
+
+        # Output error if solution cannot be found
+        print(results.solver.status)
 
         # Turn lists into numpy arrays
         mpc_state = np.array(mpc_state)
-
         mpc_action = np.array(mpc_action)
+        sys_state = np.array(sys_state)
 
         return mpc_state, sys_state, mpc_action
 
     @staticmethod
     def plot(mpc_state, sys_state, mpc_action):
         for i in range(len(mpc_state[0])):
-            plt.plot(mpc_state[:, i], label='x{}'.format(i))
-            plt.plot(mpc_action[:, i], label='u{}'.format(i))
+            plt.plot(mpc_state[:, i], label='mpc_x{}'.format(i))
+            # plt.plot(sys_state[:, i], label='sys_x{}'.format(i))
+        for j in range(len(mpc_action[0])):
+            plt.plot(mpc_action[:, j], label='u{}'.format(j))
 
         plt.xlabel("Time")
+        plt.xticks(range(mpc_state.shape[0]))
         plt.legend()
         plt.savefig("mpc_plot.svg", format="svg")
         plt.show()
 
 
 if __name__ == "__main__":
-    mpc = MPC("xi.csv", "A.csv", "B.csv", 5)
+    mpc = MPC("xi.csv", "A.csv", "B.csv", 20)
     mpc_state, sys_state, mpc_action = mpc.solve()
     mpc.plot(mpc_state, sys_state, mpc_action)

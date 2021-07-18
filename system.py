@@ -75,19 +75,23 @@ class System:
 
         def model(t, x, u=None):
             if u is not None:
-                print(u)
-                time.sleep(1)
-                print(self.B)
-                time.sleep(1)
                 x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u))
+                print(x_dot)
+                # time.sleep(1)
                 return x_dot
             else:
                 x_dot = np.matmul(self.A, x)
+                print(x_dot)
+                # time.sleep(1)
                 return x_dot
 
         # Model function signature is fun(t, y)
-        sys = scipy.integrate.solve_ivp(fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='LSODA', args=u)
+        sys = scipy.integrate.solve_ivp(
+            fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='LSODA', args=u, max_step=1, min_step=1
+        )
         self.x = np.transpose(sys.y).flatten()
+        print(self.x)
+        # time.sleep(2)
 
         return self.x
 
@@ -128,5 +132,5 @@ class System:
 
 if __name__ == "__main__":
     system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    results = system.simulate(10)
+    results = system.simulate(20)
     system.plot(results)
