@@ -1,3 +1,5 @@
+import time
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -81,10 +83,10 @@ class Autoencoder():
 
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
-            self.num_epoch = 2000
+            self.num_epoch = 200
             self.batch_size = 5
             self.learning_rate = 0.05
-            self.reduced_dim_size = 30
+            self.reduced_dim_size = 2
             self.is_tuning = False
 
         # Initialise parameters
@@ -104,7 +106,9 @@ class Autoencoder():
     @staticmethod
     def process_data(data):
         # Convert to torch tensors
-        data = torch.tensor(data.to_numpy(dtype=np.float32))
+        data = data.to_numpy(dtype=np.float32)
+        data_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(data)
+        data = torch.tensor(data_scaled)
         return data
 
     def fit(self, data):
@@ -154,12 +158,12 @@ class Autoencoder():
 
 
 def autoencoder_train():
-    data = pd.read_csv("A.csv", sep=',')
+    data = pd.read_csv("df_export.csv", sep=',', usecols=["x_0", "x_1", "x_2", "x_3"])
+
+    print(data)
 
     autoencoder = Autoencoder(data)
-
     autoencoder.fit(data)
-
     # Print a model.summary to show hidden layer information
     summary(autoencoder.autoencoder.to("cpu"), verbose=2)
 

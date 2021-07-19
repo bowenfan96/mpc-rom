@@ -139,7 +139,7 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC("xi.csv", "A.csv", "B.csv", 5)
+    mpc = MPC("xi.csv", "A.csv", "B.csv", 20)
     mpc_state, sys_state, mpc_action = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state, sys_state, mpc_action)
 
