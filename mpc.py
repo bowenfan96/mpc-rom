@@ -142,3 +142,8 @@ if __name__ == "__main__":
     mpc = MPC("xi.csv", "A.csv", "B.csv", 5)
     mpc_state, sys_state, mpc_action = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state, sys_state, mpc_action)
+
+    x_df = pd.DataFrame.from_dict(mpc.model.x.extract_values(), orient='index', columns=[str(mpc.model.x)])
+    u_df = pd.DataFrame.from_dict(mpc.model.u.extract_values(), orient='index', columns=[str(mpc.model.u)])
+    print(x_df)
+    print(u_df)
