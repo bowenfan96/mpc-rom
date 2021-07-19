@@ -143,6 +143,32 @@ if __name__ == "__main__":
     mpc_state, sys_state, mpc_action = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state, sys_state, mpc_action)
 
+    # # Prepare dataset for exporting
+    # data_nrows = len(mpc.model.time)
+    # # Number of columns = number of x_i * 2 + number of u_i = A.shape[1] * 2 + B.shape[1]
+    # data_ncols = mpc.A.shape[1] * 2 + mpc.B.shape[1]
+    # data_export = np.zeros(shape=(data_nrows, data_ncols))
+    data_export = []
+
+    for time in mpc.model.time:
+        # print(value(mpc.model.x[:, time]))
+        # print(value(mpc.model.u[:, time]))
+        # print(value(mpc.model.x_dot[:, time]))
+        # data_export[time] = np.concatenate(
+        #     (value(mpc.model.x[:, time]), value(mpc.model.u[:, time]), value(mpc.model.x_dot[:, time])),
+        #     axis=None
+        #     )
+
+        data_export.append(
+            np.hstack(
+                (value(mpc.model.x[:, time]), value(mpc.model.u[:, time]), value(mpc.model.x_dot[:, time]))
+            )
+        )
+
+    data_export = np.vstack(data_export)
+
+    print(data_export)
+
     x_df = pd.DataFrame.from_dict(mpc.model.x.extract_values(), orient='index', columns=[str(mpc.model.x)])
     u_df = pd.DataFrame.from_dict(mpc.model.u.extract_values(), orient='index', columns=[str(mpc.model.u)])
     print(x_df)
