@@ -15,8 +15,8 @@ from sklearn import metrics
 from sklearn import preprocessing
 
 # Neural net structure:
-# Encoder: Full model - Intermediate - Reduced
-# Decoder: Reduced - Intermediate - Full
+# Xnn: Full model - Intermediate - Reduced
+# Unn: Reduced - Intermediate - Full
 
 
 class Encoder(nn.Module):
@@ -75,7 +75,7 @@ class Autoencoder():
             self.learning_rate = config["learning_rate"]
 
             # Desired dimension of reduced model
-            self.reduced_dim_size = config["reduced_dim"]
+            self.reduced_dim_size = config["x_rom"]
             # We report loss on validation data to RayTune if we are in tuning mode
             self.is_tuning = True
 

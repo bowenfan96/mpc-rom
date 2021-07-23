@@ -17,48 +17,52 @@ from sklearn import metrics
 from sklearn import preprocessing
 
 # Neural net structure:
-# Encoder: Full model - Intermediate - Reduced
-# Decoder: Reduced - Intermediate - Full
+# x1, x2, x3, etc > k1, k2, etc
+# u1, u2, u3, etc > j1, j2, etc
+# k1, k2, etc > z1
+# j1, j2, etc > z2
+# z1, z2 > obj
 
 
-class Encoder(nn.Module):
-    def __init__(self, model_dim, reduced_dim):
-        super(Encoder, self).__init__()
-        self.layer1 = nn.Linear(model_dim, (model_dim + reduced_dim) // 2)
-        self.layer2 = nn.Linear((model_dim + reduced_dim) // 2, reduced_dim)
+class Xnn(nn.Module):
+    def __init__(self, x_dim, x_rom):
+        super(Xnn, self).__init__()
+        # Neural net structure: xi > ki > zi
+        self.k_x = nn.Linear(x_dim, (x_dim + x_rom) // 2)
+        self.z_x = nn.Linear((x_dim + x_rom) // 2, x_rom)
 
-        nn.init.kaiming_uniform_(self.layer1.weight)
-        nn.init.kaiming_uniform_(self.layer2.weight)
+        nn.init.kaiming_uniform_(self.k_x.weight)
+        nn.init.kaiming_uniform_(self.z_x.weight)
 
     def forward(self, x_in):
         # x_in = torch.flatten(data, start_dim=1)
         # Input to intermediate layer activation
-        x_layer1 = F.leaky_relu(self.layer1(x_in))
-        # Intermediate to compressed layer - no activation
-        x_rom = self.layer2(x_layer1)
-        return x_rom
+        x_k = F.leaky_relu(self.k_x(x_in))
+        # Intermediate to compressed layer
+        x_z = F.leaky_relu(self.z_x(x_k))
+        return x_z
 
 
-class Decoder(nn.Module):
-    def __init__(self, model_dim, reduced_dim):
-        super(Decoder, self).__init__()
-        self.layer3 = nn.Linear(reduced_dim, (model_dim + reduced_dim) // 2)
-        self.layer4 = nn.Linear((model_dim + reduced_dim) // 2, model_dim)
+class Unn(nn.Module):
+    def __init__(self, u_dim, u_rom):
+        super(Unn, self).__init__()
+        self.k_u = nn.Linear(u_rom, (u_dim + u_rom) // 2)
+        self.z_u = nn.Linear((u_dim + u_rom) // 2, u_dim)
 
-        nn.init.kaiming_uniform_(self.layer3.weight)
-        nn.init.kaiming_uniform_(self.layer4.weight)
+        nn.init.kaiming_uniform_(self.k_u.weight)
+        nn.init.kaiming_uniform_(self.z_u.weight)
 
-    def forward(self, x_rom):
-        x_layer3 = F.leaky_relu(self.layer3(x_rom))
-        x_out = torch.sigmoid(self.layer4(x_layer3))
-        return x_out
+    def forward(self, u_in):
+        u_k = F.leaky_relu(self.k_u(u_in))
+        u_z = F.leaky_relu(self.z_u(u_k))
+        return u_z
 
 
 class Wrapper(nn.Module):
-    def __init__(self, model_dim, reduced_dim):
+    def __init__(self, x_dim, x_rom, u_dim, u_rom):
         super(Wrapper, self).__init__()
-        self.encoder = Encoder(model_dim, reduced_dim)
-        self.decoder = Decoder(model_dim, reduced_dim)
+        self.x_mor = Xnn(x_dim, x_rom)
+        self.u_mor = Unn(u_dim, u_rom)
 
     def forward(self, x_in):
         x_rom = self.encoder(x_in)
@@ -66,9 +70,9 @@ class Wrapper(nn.Module):
         return x_out
 
 
-class Autoencoder():
+class MOR():
     def __init__(self, data, config=None):
-        super(Autoencoder, self).__init__()
+        super(MOR, self).__init__()
 
         # Hyperparameters
         if config is not None:
@@ -77,7 +81,9 @@ class Autoencoder():
             self.learning_rate = config["learning_rate"]
 
             # Desired dimension of reduced model
-            self.reduced_dim_size = config["reduced_dim"]
+            self.x_rom = config["x_rom"]
+            # Desired dimension of reduced model
+            self.u_rom = config["u_rom"]
             # We report loss on validation data to RayTune if we are in tuning mode
             self.is_tuning = True
 
@@ -86,22 +92,21 @@ class Autoencoder():
             self.num_epoch = 200
             self.batch_size = 5
             self.learning_rate = 0.05
-            self.reduced_dim_size = 2
+            # Desired dimension of reduced model
+            self.x_rom = 2
+            # Desired dimension of reduced model
+            self.u_rom = 2
             self.is_tuning = False
 
         # Initialise parameters
         processed_data = self.process_data(data)
 
         # Input size is the same as output size
-        self.model_dim = processed_data.shape[1]
+        self.x_dim = processed_data.shape[1]
+        self.u_dim = processed_data.shape[1]
 
-        print(self.model_dim)
-        print(self.reduced_dim_size)
-
-        # Initialise autoencoder neural net
-        self.autoencoder = Wrapper(self.model_dim, self.reduced_dim_size)
-
-        return
+        # Initialise neural net
+        self.model_reducer = Wrapper(self.x_dim, self.x_rom, self.u_dim, self.u_rom)
 
     @staticmethod
     def process_data(data):
@@ -116,14 +121,14 @@ class Autoencoder():
         data = self.process_data(data)
 
         # Set model to training model so gradients are updated
-        self.autoencoder.train()
+        self.model_reducer.train()
 
         # Wrap the tensors into a dataset, then load the data
         # data = torch.utils.data.TensorDataset(data)
         data_loader = torch.utils.data.DataLoader(data, batch_size=self.batch_size)
 
         # Create optimizer to use update rules
-        optimizer = optim.SGD(self.autoencoder.parameters(), lr=self.learning_rate)
+        optimizer = optim.SGD(self.model_reducer.parameters(), lr=self.learning_rate)
 
         # Specify criterion used
         criterion = nn.MSELoss()
@@ -140,7 +145,7 @@ class Autoencoder():
 
             # Minibatch gradient descent
             for minibatch_data in data_loader:
-                output = self.autoencoder(minibatch_data)
+                output = self.model_reducer(minibatch_data)
                 loss = criterion(output, minibatch_data)
                 loss.backward()
                 optimizer.step()
@@ -148,7 +153,7 @@ class Autoencoder():
 
             # Test entire dataset at this epoch
             with torch.no_grad():
-                output = self.autoencoder(data)
+                output = self.model_reducer(data)
                 loss = criterion(output, data)
 
             # Print loss
@@ -162,10 +167,10 @@ def autoencoder_train():
 
     print(data)
 
-    autoencoder = Autoencoder(data)
-    autoencoder.fit(data)
+    rom = MOR(data)
+    rom.fit(data)
     # Print a model.summary to show hidden layer information
-    summary(autoencoder.autoencoder.to("cpu"), verbose=2)
+    summary(rom.model_reducer.to("cpu"), verbose=2)
 
 # def autoencoder_test():
 
