@@ -35,11 +35,11 @@ class System:
 
         if self.C is not None:
             # Same number of outputs as the number of rows of C
-            assert self.C.ndim == 2 and self.x.shape[0] == self.C.shape[1]
+            # assert self.C.ndim == 2 and self.x.shape[0] == self.C.shape[1]
             self.y = np.zeros(self.C.shape[0])
 
         if self.D is not None:
-            assert self.D.ndim == 2 and self.x.shape[0] == self.D.shape[0]
+            # assert self.D.ndim == 2 and self.x.shape[0] == self.D.shape[0]
             assert self.u.shape[0] == self.D.shape[1]
 
     def step_casadi(self, controls=None):
@@ -48,22 +48,28 @@ class System:
         :return: New state of the system as a numpy array
         """
 
+        print(self.x.size)
+
         x = casadi.MX.sym('x', self.x.size)
+        A = casadi.DM(self.A)
+        B = casadi.DM(self.B)
 
-        # TODO: fix symbolic generator
-        A = casadi.MX(self.A)
+        # Controls should be a numpy array with same size as number of controllers
+        if controls is not None:
+            u = controls
+        else:
+            u = np.zeros(B.shape[1])
 
-        rhs = A*x
-        print(rhs)
-        print(x.shape)
-        print(rhs.shape)
+        rhs = casadi.plus(casadi.mtimes(A, x), casadi.mtimes(B, u))
 
-        ode = {'x': x, 'ode': rhs}
+        ode = {}
+        ode['x'] = x
+        ode['ode'] = rhs
         F = casadi.integrator('F', 'cvodes', ode, {'tf': 5})
-
         res = F(x0=self.x)
+        print(res["xf"])
 
-        print(res['xf'])
+        return self.x
 
     def step_scipy(self, controls=None):
         """
@@ -98,7 +104,7 @@ class System:
 
         return self.x
 
-    def simulate(self, duration, integrator="scipy", controls=None):
+    def simulate(self, duration, integrator="casadi", controls=None):
         """
         Simulate the system and plot
         :param duration: Duration (number of time steps)
