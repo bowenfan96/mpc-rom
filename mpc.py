@@ -81,6 +81,7 @@ class MPC:
         mpc_state = []
         sys_state = []
         mpc_action = []
+        obj = []
 
         if sim_sys:
             sys = system.System(self.xi_csv, self.a_csv, self.b_csv)
@@ -113,6 +114,7 @@ class MPC:
             for time in self.model.time:
                 mpc_state.append(list(value(self.model.x[:, time])))
                 mpc_action.append(list(value(self.model.u[:, time])))
+                obj.append(list(value(self.model.obj[:, time])))
 
         # Output error if solution cannot be found
         print(results.solver.status)
@@ -121,8 +123,9 @@ class MPC:
         mpc_state = np.array(mpc_state)
         mpc_action = np.array(mpc_action)
         sys_state = np.array(sys_state)
+        obj = np.array(obj)
 
-        return mpc_state, sys_state, mpc_action
+        return mpc_state, sys_state, mpc_action, obj
 
     def plot(self, mpc_state, sys_state, mpc_action):
         for i in range(len(mpc_state[0])):
@@ -140,14 +143,15 @@ class MPC:
 
 if __name__ == "__main__":
     mpc = MPC("xi.csv", "A.csv", "B.csv", 20)
-    mpc_state, sys_state, mpc_action = mpc.solve(sim_sys=False)
+    mpc_state, sys_state, mpc_action, obj = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state, sys_state, mpc_action)
 
     data_export = []
     for time in mpc.model.time:
         data_export.append(
             np.hstack(
-                (value(mpc.model.x[:, time]), value(mpc.model.u[:, time]), value(mpc.model.x_dot[:, time]))
+                (value(mpc.model.x[:, time]), value(mpc.model.u[:, time]),
+                 value(mpc.model.x_dot[:, time]), value(mpc.model.obj[:, time]))
             )
         )
     data_export = np.vstack(data_export)

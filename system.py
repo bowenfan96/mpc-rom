@@ -64,9 +64,10 @@ class System:
 
         ode = {}
         ode['x'] = x
+        ode['u'] = u
         ode['ode'] = rhs
         F = casadi.integrator('F', 'cvodes', ode, {'tf': 5})
-        res = F(x0=self.x)
+        res = F(x0=self.x, u0=self.u)
         print(res["xf"])
 
         return self.x
