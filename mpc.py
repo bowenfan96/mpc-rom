@@ -49,8 +49,8 @@ class MPC:
 
         self.model.u = Var(self.model.J, self.model.time, initialize=0)
 
-        self.discretizer = TransformationFactory('dae.finite_difference')
-        self.discretizer.apply_to(self.model, nfe=int(self.duration)*20, wrt=self.model.time, scheme='BACKWARD')
+        self.discretizer = TransformationFactory('dae.collocation')
+        self.discretizer.apply_to(self.model, wrt=self.model.time, scheme='LAGRANGE-RADAU')
 
         # Define derivative variables
         def ode_Ax(m, i, t):
@@ -101,12 +101,12 @@ class MPC:
                 self.x = self.x.flatten()
 
                 # self.model.display()
-
+                print(self.x)
                 sys_state.append(self.x)
 
-                # for i in self.model.I:
-                #     print("Time: {}, x_{}: {}".format(time, i, self.x[i]))
-                #     self.model.x[i, time].fix(self.x[i])
+                for i in self.model.I:
+                    print("Time: {}, x_{}: {}".format(time, i, self.x[i]))
+                    self.model.x[i, time].fix(self.x[i])
 
         else:
             results = opt.solve(self.model)
@@ -130,9 +130,9 @@ class MPC:
     def plot(self, mpc_state, sys_state, mpc_action):
         for i in range(len(mpc_state[0])):
             plt.plot(mpc_state[:, i], label='mpc_x{}'.format(i))
-            # plt.plot(sys_state[:, i], label='sys_x{}'.format(i))
-        for j in range(len(mpc_action[0])):
-            plt.plot(mpc_action[:, j], label='u{}'.format(j))
+            plt.plot(sys_state[:, i], label='sys_x{}'.format(i))
+        # for j in range(len(mpc_action[0])):
+        #     plt.plot(mpc_action[:, j], label='u{}'.format(j))
 
         plt.xlabel("Time")
         plt.xticks(range(mpc_state.shape[0]))
@@ -142,9 +142,12 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC("xi.csv", "A.csv", "B.csv", 20)
-    mpc_state, sys_state, mpc_action, obj = mpc.solve(sim_sys=False)
+    mpc = MPC("xi.csv", "A.csv", "B.csv", 3)
+    mpc_state, sys_state, mpc_action, obj = mpc.solve(sim_sys=True)
     mpc.plot(mpc_state, sys_state, mpc_action)
+
+    np.savetxt("mpc_state.csv", mpc_state, delimiter=",")
+    np.savetxt("sys_state.csv", sys_state, delimiter=",")
 
     data_export = []
     for time in mpc.model.time:

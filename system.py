@@ -48,29 +48,36 @@ class System:
         :return: New state of the system as a numpy array
         """
 
-        print(self.x.size)
-
         x = casadi.MX.sym('x', self.x.size)
         A = casadi.DM(self.A)
         B = casadi.DM(self.B)
 
         # Controls should be a numpy array with same size as number of controllers
         if controls is not None:
-            u = controls
+            u = casadi.DM(controls)
         else:
-            u = np.zeros(B.shape[1])
+            u = casadi.DM(np.zeros(B.shape[1]))
 
         rhs = casadi.plus(casadi.mtimes(A, x), casadi.mtimes(B, u))
 
         ode = {}
         ode['x'] = x
-        ode['u'] = u
         ode['ode'] = rhs
-        F = casadi.integrator('F', 'cvodes', ode, {'tf': 5})
-        res = F(x0=self.x, u0=self.u)
-        print(res["xf"])
 
-        return self.x
+        options = {}
+        options['tf'] = 50
+        # options['max_step_size'] = 0.001
+        # options['first_time'] = 0.001
+        # options['min_step_size'] = 0.001
+
+        F = casadi.integrator('F', 'idas', ode, options)
+        res = F(x0=self.x)
+
+        print(res)
+
+        self.x = np.array(res["xf"]).flatten()
+
+        return
 
     def step_scipy(self, controls=None):
         """
@@ -88,7 +95,6 @@ class System:
                 return x_dot
             else:
                 x_dot = np.matmul(self.A, x)
-                print("Hi")
                 # print(x_dot)
                 # time.sleep(1)
                 return x_dot
@@ -97,13 +103,14 @@ class System:
         sys = scipy.integrate.solve_ivp(
             fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='RK45', args=u,
             # Force the step size to be 1
-            max_step=1, first_step=1, atol=1e99, rtol=1e99
+            # max_step=1, first_step=1, atol=1e99, rtol=1e99
         )
         self.x = np.transpose(sys.y).flatten()
+        print(self.x)
         # print(self.x)
         # time.sleep(2)
 
-        return self.x
+        return
 
     def simulate(self, duration, integrator="casadi", controls=None):
         """
@@ -115,15 +122,16 @@ class System:
         """
         # System state through time
         sst = []
-        # sst.append(self.x)
+        sst.append(self.x)
         for time in range(duration):
             if integrator == "scipy":
-                self.x = self.step_scipy(controls if controls is not None else None)
+                self.step_scipy(controls if controls is not None else None)
             elif integrator == "casadi":
-                self.x = self.step_casadi(controls if controls is not None else None)
+                self.step_casadi(controls if controls is not None else None)
             sst.append(self.x)
 
         sst = np.array(sst)
+        print(sst)
         np.savetxt('sst.csv', sst, delimiter=',')
 
         return sst
@@ -142,5 +150,5 @@ class System:
 
 if __name__ == "__main__":
     system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    results = system.simulate(20)
+    results = system.simulate(5)
     system.plot(results)
