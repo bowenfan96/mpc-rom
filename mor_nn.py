@@ -58,16 +58,28 @@ class Unn(nn.Module):
         return u_z
 
 
-class Wrapper(nn.Module):
+class ObjNn(nn.Module):
     def __init__(self, x_dim, x_rom, u_dim, u_rom):
-        super(Wrapper, self).__init__()
+        super(ObjNn, self).__init__()
         self.x_mor = Xnn(x_dim, x_rom)
         self.u_mor = Unn(u_dim, u_rom)
 
-    def forward(self, x_in):
-        x_rom = self.encoder(x_in)
-        x_out = self.decoder(x_rom)
-        return x_out
+        self.xu1 = nn.Linear((x_rom + u_rom), ((x_rom + u_rom + 1) // 2))
+        # Output is just 1 column - the objective value
+        self.xu2 = nn.Linear(((x_rom + u_rom + 1) // 2), 1)
+
+        nn.init.kaiming_uniform_(self.xu1.weight)
+        nn.init.kaiming_uniform_(self.xu2.weight)
+
+    def forward(self, x_in, u_in):
+        x_rom = self.x_mor(x_in)
+        u_rom = self.u_mor(u_in)
+
+        xu1_in = torch.hstack((x_rom, u_rom))
+        xu1_out = F.leaky_relu(self.xu1(xu1_in))
+        obj_pred = F.leaky_relu(self.xu2(xu1_out))
+
+        return obj_pred
 
 
 class MOR():
@@ -106,7 +118,7 @@ class MOR():
         self.u_dim = processed_data.shape[1]
 
         # Initialise neural net
-        self.model_reducer = Wrapper(self.x_dim, self.x_rom, self.u_dim, self.u_rom)
+        self.model_reducer = ObjNn(self.x_dim, self.x_rom, self.u_dim, self.u_rom)
 
     @staticmethod
     def process_data(data):
