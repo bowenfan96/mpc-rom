@@ -114,8 +114,8 @@ class MOR():
         processed_data = self.process_data(data)
 
         # Input size is the same as output size
-        self.x_dim = processed_data.shape[1]
-        self.u_dim = processed_data.shape[1]
+        self.x_dim = 4
+        self.u_dim = 2
 
         # Initialise neural net
         self.model_reducer = ObjNn(self.x_dim, self.x_rom, self.u_dim, self.u_rom)
@@ -157,7 +157,7 @@ class MOR():
 
             # Minibatch gradient descent
             for minibatch_data in data_loader:
-                output = self.model_reducer(minibatch_data)
+                output = self.model_reducer(minibatch_data, minibatch_data)
                 loss = criterion(output, minibatch_data)
                 loss.backward()
                 optimizer.step()
@@ -175,7 +175,9 @@ class MOR():
 
 
 def autoencoder_train():
-    data = pd.read_csv("df_export.csv", sep=',', usecols=["x_0", "x_1", "x_2", "x_3"])
+    data = pd.read_csv("df_export.csv", sep=','
+                       # , usecols=["x_0", "x_1", "x_2", "x_3"]
+                       )
 
     print(data)
 

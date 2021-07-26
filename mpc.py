@@ -69,8 +69,12 @@ class MPC:
                 self.model.x[i, 0].fix(self.x[i])
 
         # Objective: Bring the entire system to zero
+        # sum(abs(value(self.model.x[i, time])) for i in self.model.I)
+        def obj_rule(m):
+            return sum(abs(m.x[j]) for j in m.I * m.time)
+
         self.model.obj = Objective(
-            expr=(sum(self.model.x[j] for j in self.model.I * self.model.time))**2,
+            rule=obj_rule,
             sense=minimize
         )
 
@@ -114,7 +118,12 @@ class MPC:
             for time in self.model.time:
                 mpc_state.append(list(value(self.model.x[:, time])))
                 mpc_action.append(list(value(self.model.u[:, time])))
-                obj.append(list(value(self.model.obj[:, time])))
+
+                # sum(abs(m.x[j]) for j in m.I * m.time)
+                print("Cost function")
+                print(sum(abs(value(self.model.x[i, time])) for i in self.model.I))
+
+                obj.append(sum(abs(value(self.model.x[i, time])) for i in self.model.I))
 
         # Output error if solution cannot be found
         print(results.solver.status)
@@ -125,12 +134,14 @@ class MPC:
         sys_state = np.array(sys_state)
         obj = np.array(obj)
 
+        print(obj)
+
         return mpc_state, sys_state, mpc_action, obj
 
     def plot(self, mpc_state, sys_state, mpc_action):
         for i in range(len(mpc_state[0])):
             plt.plot(mpc_state[:, i], label='mpc_x{}'.format(i))
-            plt.plot(sys_state[:, i], label='sys_x{}'.format(i))
+            # plt.plot(sys_state[:, i], label='sys_x{}'.format(i))
         # for j in range(len(mpc_action[0])):
         #     plt.plot(mpc_action[:, j], label='u{}'.format(j))
 
@@ -142,8 +153,8 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC("xi.csv", "A.csv", "B.csv", 3)
-    mpc_state, sys_state, mpc_action, obj = mpc.solve(sim_sys=True)
+    mpc = MPC("xi.csv", "A.csv", "B.csv", 5)
+    mpc_state, sys_state, mpc_action, obj = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state, sys_state, mpc_action)
 
     np.savetxt("mpc_state.csv", mpc_state, delimiter=",")
@@ -153,18 +164,25 @@ if __name__ == "__main__":
     for time in mpc.model.time:
         data_export.append(
             np.hstack(
-                (value(mpc.model.x[:, time]), value(mpc.model.u[:, time]),
-                 value(mpc.model.x_dot[:, time]), value(mpc.model.obj[:, time]))
+                # value(mpc.model.x_dot[:, time])
+                (value(mpc.model.x[:, time]), value(mpc.model.u[:, time]))
             )
         )
-    data_export = np.vstack(data_export)
+    data_export = np.array(data_export)
+    print("OBJ")
+    print(obj)
+    data_export = np.column_stack((data_export, obj))
 
     print(data_export)
+    print(mpc.A.shape[1])
 
     df_col_names = []
     df_col_names.extend("x_{}".format(i) for i in range(mpc.A.shape[1]))
     df_col_names.extend("u_{}".format(i) for i in range(mpc.B.shape[1]))
-    df_col_names.extend("xdot_{}".format(i) for i in range(mpc.A.shape[1]))
+    # df_col_names.extend("xdot_{}".format(i) for i in range(mpc.A.shape[1]))
+    df_col_names.extend(["obj"])
+
+    print(df_col_names)
 
     df_export = pd.DataFrame(data_export, columns=df_col_names)
 
