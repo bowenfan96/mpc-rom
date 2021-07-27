@@ -122,8 +122,15 @@ class MOR():
 
     @staticmethod
     def process_data(data):
+        # Split x, u and obj columns
+        x = data.filter(regex='x_')
+        u = data.filter(regex='u_')
+        obj = data.filter(items='obj')
+
         # Convert to torch tensors
-        data = data.to_numpy(dtype=np.float32)
+        x = x.to_numpy(dtype=np.float32)
+        u = u.to_numpy(dtype=np.float32)
+        obj = obj.to_numpy(dtype=np.float32)
         data_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(data)
         data = torch.tensor(data_scaled)
         return data
@@ -149,19 +156,19 @@ class MOR():
         for epoch in range(self.num_epoch):
 
             # Full dataset gradient descent
-            # output = self.autoencoder(data)
-            # loss = criterion(output, data)
-            # loss.backward()
-            # optimizer.step()
-            # optimizer.zero_grad()
+            output = self.model_reducer(data)
+            loss = criterion(output, data)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
             # Minibatch gradient descent
-            for minibatch_data in data_loader:
-                output = self.model_reducer(minibatch_data, minibatch_data)
-                loss = criterion(output, minibatch_data)
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+            # for minibatch_data in data_loader:
+            #     output = self.model_reducer(minibatch_data, minibatch_data)
+            #     loss = criterion(output, minibatch_data)
+            #     loss.backward()
+            #     optimizer.step()
+            #     optimizer.zero_grad()
 
             # Test entire dataset at this epoch
             with torch.no_grad():
