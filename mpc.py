@@ -78,6 +78,22 @@ class MPC:
             sense=minimize
         )
 
+    def cost_to_go(self, timestep):
+        """
+        Compute the cumulative cost from timestep t_i to t_f
+        :param timestep: Timestep t_i from which to compute cost
+        :return: Cost to go
+        """
+        cost = 0
+        print(timestep)
+
+        for t in self.model.time:
+            # Can't figure out how to iterate a sliced pyomo set (continuous), so doing this:
+            if t >= timestep:
+                cost += sum(abs(value(self.model.x[i, t])) for i in self.model.I)
+
+        return cost
+
     def solve(self, sim_sys=True):
         opt = SolverFactory('ipopt', tee=True)
         results = None
@@ -120,7 +136,8 @@ class MPC:
                 mpc_action.append(list(value(self.model.u[:, time])))
 
                 # sum(abs(m.x[j]) for j in m.I * m.time)
-                print("Cost function")
+                print("Cost to go")
+                print(self.cost_to_go(time))
                 print(sum(abs(value(self.model.x[i, time])) for i in self.model.I))
 
                 obj.append(sum(abs(value(self.model.x[i, time])) for i in self.model.I))
