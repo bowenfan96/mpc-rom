@@ -85,7 +85,6 @@ class MPC:
         :return: Cost to go
         """
         cost = 0
-        print(timestep)
 
         for t in self.model.time:
             # Can't figure out how to iterate a sliced pyomo set (continuous), so doing this:

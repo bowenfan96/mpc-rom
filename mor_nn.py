@@ -58,11 +58,27 @@ class Unn(nn.Module):
         return u_z
 
 
+class UnnDecoder(nn.Module):
+    def __init__(self, u_dim, u_rom):
+        super(UnnDecoder, self).__init__()
+        self.o1_u = nn.Linear(u_dim, (u_dim + u_rom) // 2)
+        self.o2_u = nn.Linear((u_dim + u_rom) // 2, u_dim)
+
+        nn.init.kaiming_uniform_(self.o1_u.weight)
+        nn.init.kaiming_uniform_(self.o2_u.weight)
+
+    def forward(self, u_rom_in):
+        u_out1 = F.leaky_relu(self.o1_u(u_rom_in))
+        u_out2 = F.leaky_relu(self.o2_u(u_out1))
+        return u_out2
+
+
 class ObjNn(nn.Module):
     def __init__(self, x_dim, x_rom, u_dim, u_rom):
         super(ObjNn, self).__init__()
         self.x_mor = Xnn(x_dim, x_rom)
         self.u_mor = Unn(u_dim, u_rom)
+        self.u_decoder = UnnDecoder(u_dim, u_rom)
 
         self.xu1 = nn.Linear((x_rom + u_rom), ((x_rom + u_rom + 1) // 2))
         # Output is just 1 column - the objective value
@@ -75,14 +91,19 @@ class ObjNn(nn.Module):
         x_rom = self.x_mor(x_in)
         u_rom = self.u_mor(u_in)
 
-        xu1_in = torch.hstack((x_rom, u_rom))
-        xu1_out = F.leaky_relu(self.xu1(xu1_in))
-        obj_pred = F.leaky_relu(self.xu2(xu1_out))
+        # Predict cost to go
+        xu_rom_in = torch.hstack((x_rom, u_rom))
+        xu_rom_out = F.leaky_relu(self.xu1(xu_rom_in))
+        ctg_pred = F.leaky_relu(self.xu2(xu_rom_out))
 
-        return obj_pred
+        # Decode compressed u
+        u_decoded = self.u_decoder(u_rom)
+
+        return ctg_pred, u_decoded
 
 
-class MOR():
+# Model Order Reducer
+class MOR:
     def __init__(self, data, config=None):
         super(MOR, self).__init__()
 
