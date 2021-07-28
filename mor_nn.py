@@ -24,6 +24,7 @@ from sklearn import preprocessing
 # z1, z2 > obj
 
 
+# Create the auxiliary neural networks
 class Xnn(nn.Module):
     def __init__(self, x_dim, x_rom):
         super(Xnn, self).__init__()
@@ -143,28 +144,37 @@ class MOR:
 
     @staticmethod
     def process_data(data):
-        # Split x, u and obj columns
+        # Split x, u and cost to go columns
         x = data.filter(regex='x_')
         u = data.filter(regex='u_')
-        obj = data.filter(items='obj')
+        # Cost to go
+        ctg = data.filter(items='ctg')
 
-        # Convert to torch tensors
+        # Convert from pandas to numpy arrays
         x = x.to_numpy(dtype=np.float32)
         u = u.to_numpy(dtype=np.float32)
-        obj = obj.to_numpy(dtype=np.float32)
-        data_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(data)
-        data = torch.tensor(data_scaled)
-        return data
+        ctg = ctg.to_numpy(dtype=np.float32)
+
+        # Scale all variables to between 0 and 1 (suitable for Relu)
+        x_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(x)
+        u_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(u)
+        ctg_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(ctg)
+
+        x_scaled_tensor = torch.tensor(x_scaled)
+        u_scaled_tensor = torch.tensor(u_scaled)
+        ctg_scaled_tensor = torch.tensor(ctg_scaled)
+
+        return x_scaled_tensor, u_scaled_tensor, ctg_scaled_tensor
 
     def fit(self, data):
         # Process data, convert pandas to tensor
-        data = self.process_data(data)
+        x, u, ctg = self.process_data(data)
 
         # Set model to training model so gradients are updated
         self.model_reducer.train()
 
         # Wrap the tensors into a dataset, then load the data
-        # data = torch.utils.data.TensorDataset(data)
+        data = torch.utils.data.TensorDataset(x, u, ctg)
         data_loader = torch.utils.data.DataLoader(data, batch_size=self.batch_size)
 
         # Create optimizer to use update rules

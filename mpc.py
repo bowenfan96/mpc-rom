@@ -196,7 +196,7 @@ if __name__ == "__main__":
     df_col_names.extend("x_{}".format(i) for i in range(mpc.A.shape[1]))
     df_col_names.extend("u_{}".format(i) for i in range(mpc.B.shape[1]))
     # df_col_names.extend("xdot_{}".format(i) for i in range(mpc.A.shape[1]))
-    df_col_names.extend(["obj"])
+    df_col_names.extend(["ctg"])
 
     print(df_col_names)
 
