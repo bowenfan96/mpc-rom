@@ -148,7 +148,7 @@ class MOR:
         x = data.filter(regex='x_')
         u = data.filter(regex='u_')
         # Cost to go
-        ctg = data.filter(items='ctg')
+        ctg = data.filter(regex='ctg')
 
         # Convert from pandas to numpy arrays
         x = x.to_numpy(dtype=np.float32)
@@ -215,7 +215,6 @@ class MOR:
                 loss_ctg = criterion(ctg_pred, ctg)
                 loss_u = criterion(u_decoded, u)
                 loss = loss_ctg + loss_u
-                loss.backward()
 
             # Print loss
             print('The loss of epoch ' + str(epoch) + ' is ' + str(loss.item()))
@@ -224,7 +223,7 @@ class MOR:
 
 
 def autoencoder_train():
-    data = pd.read_csv("df_export.csv", sep=','
+    data = pd.read_csv("results.csv", sep=','
                        # , usecols=["x_0", "x_1", "x_2", "x_3"]
                        )
 

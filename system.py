@@ -132,7 +132,7 @@ class System:
         else:
             for c in range(num_ctrls):
                 rand_ctrls[:, c] = generator.uniform(
-                    low=-1e3, high=1e3,
+                    low=-1e4, high=1e4,
                     size=(duration, 1)
                 ).transpose()
         return rand_ctrls
@@ -155,9 +155,9 @@ class System:
         ctg = []
         for t in range(x.shape[0]):
             if t == 0:
-                ctg[t] = cost(x[t])
+                ctg.append(cost(x[t]))
             else:
-                ctg[t] = cost(x[t]) + ctg[t-1]
+                ctg.append(cost(x[t]) + ctg[t-1])
         ctg = np.array(ctg).transpose()
 
         return ctg
@@ -205,46 +205,51 @@ class System:
                     self.step_casadi(rand_ctrls[t])
             return x_u
 
-    def sys_simulate(self, duration, integrator="casadi", constraints=None):
-        """
-        Simulate the system itself with random controls signals, for the purpose of generating data
-        to train the model reduction neural network
-        :param constraints: Controller constraints
-        :param duration: Number of time steps
-        :param integrator: casadi or scipy
-        :return: System states at all time steps
-        """
-        if integrator == "casadi":
-            x = casadi.MX.sym('x', self.x.size)
-            u = casadi.DM(self.generate_random_controls(duration))
-            A = casadi.DM(self.A)
-            B = casadi.DM(self.B)
-            rhs = casadi.plus(casadi.mtimes(A, x), casadi.mtimes(B, u))
-            ode = {'x': x, 'ode': rhs}
-            options = {'tf': duration}
-            F = casadi.integrator('F', 'idas', ode, options)
-            res = F(x0=self.x)
-            print(res)
-            self.x = np.array(res["xf"]).flatten()
-            return
+    # def sys_simulate(self, duration, integrator="casadi", constraints=None):
+    #     """
+    #     Simulate the system itself with random controls signals, for the purpose of generating data
+    #     to train the model reduction neural network
+    #     :param constraints: Controller constraints
+    #     :param duration: Number of time steps
+    #     :param integrator: casadi or scipy
+    #     :return: System states at all time steps
+    #     """
+    #     if integrator == "casadi":
+    #         x = casadi.MX.sym('x', self.x.size)
+    #         u = casadi.DM(self.generate_random_controls(duration))
+    #         A = casadi.DM(self.A)
+    #         B = casadi.DM(self.B)
+    #         rhs = casadi.plus(casadi.mtimes(A, x), casadi.mtimes(B, u))
+    #         ode = {'x': x, 'ode': rhs}
+    #         options = {'tf': duration}
+    #         F = casadi.integrator('F', 'idas', ode, options)
+    #         res = F(x0=self.x)
+    #         print(res)
+    #         self.x = np.array(res["xf"]).flatten()
+    #         return
+    #
+    #     elif integrator == "scipy":
+    #         def model(t, x, u):
+    #             x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u[t]))
+    #             return x_dot
+    #         u = self.generate_random_controls(duration)
+    #         sys = scipy.integrate.solve_ivp(
+    #             fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='RK45', args=u,
+    #         )
+    #         self.x = np.transpose(sys.y).flatten()
+    #         print(self.x)
+    #         return
 
-        elif integrator == "scipy":
-            def model(t, x, u):
-                x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u[t]))
-                return x_dot
-            u = self.generate_random_controls(duration)
-            sys = scipy.integrate.solve_ivp(
-                fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='RK45', args=u,
-            )
-            self.x = np.transpose(sys.y).flatten()
-            print(self.x)
-            return
-
-    @staticmethod
-    def plot(sst):
-        assert sst.ndim == 2
-        for i in range(sst.shape[1]):
-            plt.plot(sst[:, i], label='x{}'.format(i))
+    def plot(self, x_u_ctg, plot_x=True, plot_u=True, plot_ctg=False):
+        assert x_u_ctg.ndim == 2
+        if plot_x:
+            for i in range(self.x.size):
+                plt.plot(x_u_ctg[:, i], label='x{}'.format(i))
+        if plot_u:
+            for j in range(self.u.size):
+                plt.plot(x_u_ctg[:, j+self.x.size], label='u{}'.format(j))
+        if plot_ctg:
+            plt.plot(x_u_ctg[:, -1], label='ctg')
 
         plt.xlabel("Time")
         plt.legend()
@@ -254,5 +259,8 @@ class System:
 
 if __name__ == "__main__":
     system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    results = system.simulate(50)
+    results = system.simulate(500)
+    ctg = system.calc_ctg(results)
+    results = np.hstack((results, ctg.reshape(results.shape[0], 1)))
+    np.savetxt('results.csv', results, delimiter=',')
     system.plot(results)
