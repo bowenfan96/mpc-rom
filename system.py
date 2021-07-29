@@ -64,7 +64,7 @@ class System:
         ode['ode'] = rhs
 
         options = {}
-        options['tf'] = 50
+        options['tf'] = 1
         # options['max_step_size'] = 0.001
         # options['first_time'] = 0.001
         # options['min_step_size'] = 0.001
@@ -161,28 +161,46 @@ class System:
 
         return ctg
 
-    def mpc_simulate(self, duration, integrator="casadi", controls=None):
+    def simulate(self, duration, integrator="casadi", controls=None, ctrl_constraints=None):
         """
-        Simulate the system and plot
+        Simulate the system, where it is either controlled by the MPC or by random generated control signals
         :param duration: Duration (number of time steps)
         :param integrator: "scipy" or "casadi"
         :param controls: Control signals
-        :return: Simulated system state over the duration (sst)
+        :param ctrl_constraints: Controller constraints if randomly generating
+        :return: Simulated system and controller state, and cost to go, over the duration
         """
-        # System state through time
-        sst = []
-        sst.append(self.x)
-        for time in range(duration):
-            if integrator == "scipy":
-                self.step_scipy(controls if controls is not None else None)
-            elif integrator == "casadi":
-                self.step_casadi(controls if controls is not None else None)
-            sst.append(self.x)
+        # If controls are None, the simulation is not called by the MPC
+        # Hence generate random controls
+        called_by_mpc = True
+        if controls is None:
+            rand_ctrls = self.generate_random_controls(duration, ctrl_constraints)
+            called_by_mpc = False
 
-        sst = np.array(sst)
-        print(sst)
-        np.savetxt('sst.csv', sst, delimiter=',')
-        return sst
+        if called_by_mpc:
+            # System state through time
+            x_u = np.zeros(shape=(duration, self.x.size + controls.size))
+            for t in range(duration):
+                x_u[t, 0:self.x.size] = self.x
+                x_u[t, (self.x.size+1):-1] = controls
+                # self.x updated to next time step
+                if integrator == "scipy":
+                    self.step_scipy(controls)
+                elif integrator == "casadi":
+                    self.step_casadi(controls)
+            return x_u
+
+        else:
+            x_u = np.zeros(shape=(duration, self.x.size + rand_ctrls.shape[1]))
+            for t in range(duration):
+                x_u[t, 0:self.x.size] = self.x
+                x_u[t, self.x.size:] = rand_ctrls[t]
+                # self.x updated to next time step
+                if integrator == "scipy":
+                    self.step_scipy(rand_ctrls[t])
+                elif integrator == "casadi":
+                    self.step_casadi(rand_ctrls[t])
+            return x_u
 
     def sys_simulate(self, duration, integrator="casadi", constraints=None):
         """
@@ -233,5 +251,5 @@ class System:
 
 if __name__ == "__main__":
     system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    results = system.sys_simulate(50)
-    # system.plot(results)
+    results = system.simulate(50)
+    system.plot(results)
