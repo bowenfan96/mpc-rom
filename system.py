@@ -132,6 +132,7 @@ class System:
         else:
             for c in range(num_ctrls):
                 rand_ctrls[:, c] = generator.uniform(
+                    low=-1e3, high=1e3,
                     size=(duration, 1)
                 ).transpose()
         return rand_ctrls
@@ -175,6 +176,8 @@ class System:
         called_by_mpc = True
         if controls is None:
             rand_ctrls = self.generate_random_controls(duration, ctrl_constraints)
+            print("RANDOM CONTROLS")
+            print(rand_ctrls)
             called_by_mpc = False
 
         if called_by_mpc:
