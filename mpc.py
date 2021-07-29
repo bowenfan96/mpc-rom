@@ -116,7 +116,7 @@ class MPC:
 
                 mpc_action.append(controls)
 
-                self.x = np.array(sys.simulate(duration=1, controls=controls))
+                self.x = np.array(sys.mpc_simulate(duration=1, controls=controls))
                 self.x = self.x.flatten()
 
                 # self.model.display()

@@ -47,7 +47,6 @@ class System:
         Simulate the system using Casadi through 1 time step
         :return: New state of the system as a numpy array
         """
-
         x = casadi.MX.sym('x', self.x.size)
         A = casadi.DM(self.A)
         B = casadi.DM(self.B)
@@ -81,7 +80,7 @@ class System:
 
     def step_scipy(self, controls=None):
         """
-        Simulate the system using scipy integrator
+        Simulate the system using scipy integrator through 1 time step
         :return:
         """
         # Controls should be a numpy array with same size as number of controllers
@@ -109,10 +108,35 @@ class System:
         print(self.x)
         # print(self.x)
         # time.sleep(2)
-
         return
 
-    def simulate(self, duration, integrator="casadi", controls=None):
+    def generate_random_controls(self, duration, constraints=None):
+        """
+        This function generates random controls signals for each controller at each time step,
+        for the purpose of training the model reduction neural network
+        :param duration: Number of time steps
+        :param constraints: List of tuple of bounds on the control signals, both inclusive
+        Format: [[(lower_u1, upper_u1)], [(lower_u2, upper_u2)]] etc.
+        :return: Array of control signals at each time step
+        Format: [[t1_u1, t1_u2, t1_u3, etc.], [t2_u1, t2_u2, t2_u3, etc.]]
+        """
+        num_ctrls = self.u.size
+        rand_ctrls = np.zeros((duration, num_ctrls))
+        generator = np.random.default_rng()
+        if constraints is not None:
+            for c in range(num_ctrls):
+                rand_ctrls[:, c] = generator.uniform(
+                    low=constraints[c][0], high=constraints[c][1],
+                    size=(duration, 1)
+                ).transpose()
+        else:
+            for c in range(num_ctrls):
+                rand_ctrls[:, c] = generator.uniform(
+                    size=(duration, 1)
+                ).transpose()
+        return rand_ctrls
+
+    def mpc_simulate(self, duration, integrator="casadi", controls=None):
         """
         Simulate the system and plot
         :param duration: Duration (number of time steps)
@@ -133,8 +157,42 @@ class System:
         sst = np.array(sst)
         print(sst)
         np.savetxt('sst.csv', sst, delimiter=',')
-
         return sst
+
+    def sys_simulate(self, duration, integrator="casadi", constraints=None):
+        """
+        Simulate the system itself with random controls signals, for the purpose of generating data
+        to train the model reduction neural network
+        :param constraints: Controller constraints
+        :param duration: Number of time steps
+        :param integrator: casadi or scipy
+        :return: System states at all time steps
+        """
+        if integrator == "casadi":
+            x = casadi.MX.sym('x', self.x.size)
+            u = casadi.DM(self.generate_random_controls(duration))
+            A = casadi.DM(self.A)
+            B = casadi.DM(self.B)
+            rhs = casadi.plus(casadi.mtimes(A, x), casadi.mtimes(B, u))
+            ode = {'x': x, 'ode': rhs}
+            options = {'tf': duration}
+            F = casadi.integrator('F', 'idas', ode, options)
+            res = F(x0=self.x)
+            print(res)
+            self.x = np.array(res["xf"]).flatten()
+            return
+
+        elif integrator == "scipy":
+            def model(t, x, u):
+                x_dot = np.add(np.matmul(self.A, x), np.matmul(self.B, u[t]))
+                return x_dot
+            u = self.generate_random_controls(duration)
+            sys = scipy.integrate.solve_ivp(
+                fun=model, t_span=(0, 1), t_eval=[1], y0=self.x, method='RK45', args=u,
+            )
+            self.x = np.transpose(sys.y).flatten()
+            print(self.x)
+            return
 
     @staticmethod
     def plot(sst):
@@ -150,5 +208,5 @@ class System:
 
 if __name__ == "__main__":
     system = System("xi.csv", "A.csv", "B.csv", "C.csv")
-    results = system.simulate(5)
-    system.plot(results)
+    results = system.sys_simulate(50)
+    # system.plot(results)
