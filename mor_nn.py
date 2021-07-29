@@ -187,24 +187,35 @@ class MOR:
         for epoch in range(self.num_epoch):
 
             # Full dataset gradient descent
-            output = self.model_reducer(data)
-            loss = criterion(output, data)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            # output = self.model_reducer(data)
+            # loss = criterion(output, data)
+            # loss.backward()
+            # optimizer.step()
+            # optimizer.zero_grad()
 
             # Minibatch gradient descent
-            # for minibatch_data in data_loader:
-            #     output = self.model_reducer(minibatch_data, minibatch_data)
-            #     loss = criterion(output, minibatch_data)
-            #     loss.backward()
-            #     optimizer.step()
-            #     optimizer.zero_grad()
+            # x, u and ctg are grouped in minibatches
+            for x_mb, u_mb, ctg_mb in data_loader:
+                # Model reducer takes x_in, u_in
+                ctg_pred, u_decoded = self.model_reducer(x_mb, u_mb)
+
+                # Loss is the loss of both ctg and decoded u
+                loss_ctg = criterion(ctg_pred, ctg_mb)
+                loss_u = criterion(u_decoded, u_mb)
+                loss = loss_ctg + loss_u
+                loss.backward()
+
+                optimizer.step()
+                optimizer.zero_grad()
 
             # Test entire dataset at this epoch
             with torch.no_grad():
-                output = self.model_reducer(data)
-                loss = criterion(output, data)
+                ctg_pred, u_decoded = self.model_reducer(x, u)
+                # Loss is the loss of both ctg and decoded u
+                loss_ctg = criterion(ctg_pred, ctg)
+                loss_u = criterion(u_decoded, u)
+                loss = loss_ctg + loss_u
+                loss.backward()
 
             # Print loss
             print('The loss of epoch ' + str(epoch) + ' is ' + str(loss.item()))
