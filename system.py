@@ -136,6 +136,31 @@ class System:
                 ).transpose()
         return rand_ctrls
 
+    def calc_ctg(self, xu):
+        """
+        Calculate the cost to go given system and controller states
+        :param xu: System (x) and controller (u) states given as an array in the format
+        [[x1_t1, x2_t1, etc, u1_t1 etc], [x1_t2, x2_t2, etc, u1_t2 etc], etc]
+        :return: Cost to go from each time step as a numpy column vector
+        """
+        xu = np.hsplit(xu, [self.x.size])
+        x = xu[0]
+        u = xu[1]
+
+        # ----- EDIT COST FUNCTION HERE ----- #
+        def cost(x_row):
+            return sum(abs(xi) for xi in x_row)
+
+        ctg = []
+        for t in range(x.shape[0]):
+            if t == 0:
+                ctg[t] = cost(x[t])
+            else:
+                ctg[t] = cost(x[t]) + ctg[t-1]
+        ctg = np.array(ctg).transpose()
+
+        return ctg
+
     def mpc_simulate(self, duration, integrator="casadi", controls=None):
         """
         Simulate the system and plot
