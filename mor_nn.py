@@ -217,7 +217,7 @@ class MOR:
                 loss = loss_ctg + loss_u
 
             # Print loss
-            print('The loss of epoch ' + str(epoch) + ' is ' + str(loss.item()))
+            print('Epoch ' + str(epoch) + ': ctg- ' + str(loss_ctg.item()) + '| u- ' + str(loss_u.item()))
 
         return self
 
