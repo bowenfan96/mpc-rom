@@ -11,9 +11,6 @@ import deap.tools
 import deap.algorithms
 
 
-
-
-
 class GdOpt:
     def __init__(self, mor_nn):
         print("Gradient descent optimizer")
@@ -34,7 +31,14 @@ class GdOpt:
         return
 
     def nn_func(self, u_k, *x_k):
-        return 1
+        """
+        Predict cost to go using neural net
+        :param u_k: u_k_tilde, the reduced control variables (to be found)
+        :param x_k: x_k_tilde, the reduced state variables
+        :return: Cost to go, predicted using the neural net
+        """
+        ctg_pred = self.mor_nn.predict_ctg(x_k, u_k)
+        return ctg_pred
 
 
 class DeapOpt():
@@ -51,6 +55,14 @@ class DeapOpt():
         self.toolbox.register("evaluate", self.evaluate, x_k=self.x_k)
 
     def evaluate(self, indivdual, x_k):
+        """
+        Predict cost to go using neural net
+        :param indivdual: u_k_tilde, the reduced control variables (to be found)
+        :param x_k: x_k_tilde, the reduced state variables
+        :return:
+        """
+
+
         return 2
 
 

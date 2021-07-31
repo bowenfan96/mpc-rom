@@ -17,11 +17,12 @@ from sklearn import metrics
 from sklearn import preprocessing
 
 # Neural net structure:
-# x1, x2, x3, etc > k1, k2, etc
+# x1, x2, x3, etc > i1, i2, etc
 # u1, u2, u3, etc > j1, j2, etc
-# k1, k2, etc > z1
-# j1, j2, etc > z2
-# z1, z2 > obj
+# i1, i2, etc > x_tilde1, x_tilde2, etc
+# j1, j2, etc > u_tilde1, u_tilde2, etc
+# x_t1, x_t2, etc, u_t1, u_t2, etc > k1, k2, etc
+# k1, k2, etc > ctg
 
 
 # Create the auxiliary neural networks
@@ -229,22 +230,38 @@ class MOR:
 
         return self
 
+    def predict_ctg(self, x_rom, u_rom):
+        ctg_pred = self.model_reducer.ctg(x_rom, u_rom)
+        return ctg_pred
 
-def autoencoder_train():
+    def decode_u(self, u_rom):
+        u_pred = self.model_reducer.u_decoder(u_rom)
+        return u_pred
+
+
+def train():
     data = pd.read_csv("results.csv", sep=','
                        # , usecols=["x_0", "x_1", "x_2", "x_3"]
                        )
-
     print(data)
-
     rom = MOR(data)
     rom.fit(data)
     # Print a model.summary to show hidden layer information
     summary(rom.model_reducer.to("cpu"), verbose=2)
 
-# def autoencoder_test():
+    pickle_mor_nn(rom)
+
+
+def pickle_mor_nn(mor_nn_trained):
+    """
+    Pickle the trained neural net
+    :param mor_nn_trained: Trained model reduction neural net
+    :return: Save the pickled file
+    """
+    with open('mor_nn.pickle', 'wb') as model:
+        pickle.dump(mor_nn_trained, model)
+    print("\nSaved model to mor_nn.pickle\n")
 
 
 if __name__ == "__main__":
-    autoencoder_train()
-    # autoencoder_test()
+    train()
