@@ -157,7 +157,8 @@ class System:
             if t == 0:
                 ctg.append(cost(x[t]))
             else:
-                ctg.append(cost(x[t]) + ctg[t-1])
+                ctg.append(cost(x[t]))
+                ctg[t-1] += ctg[t]
         ctg = np.array(ctg).transpose()
 
         return ctg
@@ -258,9 +259,9 @@ class System:
 
 
 if __name__ == "__main__":
-    system = System("xi.csv", "A.csv", "B.csv", "C.csv")
+    system = System("/matrices/xi.csv", "/matrices/A.csv", "/matrices/B.csv", "/matrices/C.csv")
     results = system.simulate(500)
     ctg = system.calc_ctg(results)
     results = np.hstack((results, ctg.reshape(results.shape[0], 1)))
-    np.savetxt('results.csv', results, delimiter=',')
+    np.savetxt('/results_csv/results.csv', results, delimiter=',')
     system.plot(results)
