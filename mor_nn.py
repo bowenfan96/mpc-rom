@@ -115,7 +115,6 @@ class ObjNn(nn.Module):
 # Model Order Reducer
 class MOR:
     def __init__(self, data, config=None):
-        super(MOR, self).__init__()
 
         # Hyperparameters
         if config is not None:
