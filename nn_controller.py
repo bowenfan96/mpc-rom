@@ -1,6 +1,9 @@
 import scipy.optimize
 import numpy as np
+
 import pickle
+# Import mor_nn namespace for pickle to work
+from mor_nn import *
 
 import pymoo
 import leap_ec
@@ -23,12 +26,12 @@ class GdOpt:
         :param x_k: x_k_tilde parameters, fixed
         :return: optimal u_k_tilde parameters
         """
-        init_guess = np.zeros(10) # u.size
-        scipy.optimize.minimize(
+        init_guess = np.zeros(2)  # u_tilde.size
+        result = scipy.optimize.minimize(
             fun=self.nn_func, x0=init_guess, args=x_k, method='BFGS'
         )
 
-        return
+        return result
 
     def nn_func(self, u_k, *x_k):
         """
@@ -37,7 +40,7 @@ class GdOpt:
         :param x_k: x_k_tilde, the reduced state variables
         :return: Cost to go, predicted using the neural net
         """
-        ctg_pred = self.mor_nn.predict_ctg(x_k, u_k)
+        ctg_pred = self.mor_nn.predict_ctg(x_k[0], u_k)
         return ctg_pred
 
 
@@ -54,28 +57,37 @@ class DeapOpt():
         self.toolbox.register("select", deap.tools.selTournament, tournsize=3)
         self.toolbox.register("evaluate", self.evaluate, x_k=self.x_k)
 
-    def evaluate(self, indivdual, x_k):
+    def evaluate(self, individual, x_k):
         """
         Predict cost to go using neural net
-        :param indivdual: u_k_tilde, the reduced control variables (to be found)
+        :param individual: u_k_tilde, the reduced control variables (to be found)
         :param x_k: x_k_tilde, the reduced state variables
         :return:
         """
-
-
-        return 2
+        ctg_pred = self.mor_nn.predict_ctg(x_k, individual)
+        return ctg_pred
 
 
 class NnController:
-    def __init__(self, x_k_init, optimizer='gd'):
+    def __init__(self, x_k_init, optimizer='deap'):
         # Load pickle neural net
         with open('mor_nn.pickle', 'rb') as model:
             self.mor_nn = pickle.load(model)
+
         if optimizer == 'gd':
-            opt = GdOpt()
+            self.opt = GdOpt(self.mor_nn)
+            results = self.opt.scipy_opt(np.random.rand(2))
+
+            print(results)
+
+
         elif optimizer == 'deap':
-            opt = DeapOpt()
+            x_k = np.zeros(2)
+            self.opt = DeapOpt(x_k, self.mor_nn)
 
         # Initial reduced state variables, x_k_tilde
         self.x_k = x_k_init
 
+
+if __name__ == "__main__":
+    controller = NnController(np.zeros(2))

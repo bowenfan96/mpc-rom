@@ -132,7 +132,7 @@ class MOR:
 
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
-            self.num_epoch = 200
+            self.num_epoch = 10
             self.batch_size = 5
             self.learning_rate = 0.05
             # Desired dimension of reduced model
@@ -231,11 +231,24 @@ class MOR:
         return self
 
     def predict_ctg(self, x_rom, u_rom):
-        ctg_pred = self.model_reducer.ctg(x_rom, u_rom)
+        """
+        This function is meant to be called externally by the controller
+        :param x_rom:
+        :param u_rom:
+        :return:
+        """
+        print(x_rom)
+        print(u_rom)
+        x_rom = torch.tensor(np.array(x_rom), dtype=torch.float)
+        u_rom = torch.tensor(np.array(u_rom), dtype=torch.float)
+        with torch.no_grad():
+            ctg_pred = self.model_reducer.ctg(x_rom, u_rom)
         return ctg_pred
 
     def decode_u(self, u_rom):
-        u_pred = self.model_reducer.u_decoder(u_rom)
+        u_rom = torch.tensor(np.array(u_rom))
+        with torch.no_grad():
+            u_pred = self.model_reducer.u_decoder(u_rom)
         return u_pred
 
 
