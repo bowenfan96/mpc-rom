@@ -1,10 +1,12 @@
 import time
-
 import numpy as np
 import pandas as pd
 import scipy.integrate
 import matplotlib.pyplot as plt
 import casadi
+
+results_folder = "results_csv/"
+plots_folder = "results_plots/"
 
 
 class System:
@@ -132,7 +134,7 @@ class System:
         else:
             for c in range(num_ctrls):
                 rand_ctrls[:, c] = generator.uniform(
-                    low=-1e4, high=1e4,
+                    low=-1e5, high=1e5,
                     size=(duration, 1)
                 ).transpose()
         return rand_ctrls
@@ -142,26 +144,30 @@ class System:
         Calculate the cost to go given system and controller states
         :param xu: System (x) and controller (u) states given as an array in the format
         [[x1_t1, x2_t1, etc, u1_t1 etc], [x1_t2, x2_t2, etc, u1_t2 etc], etc]
-        :return: Cost to go from each time step as a numpy column vector
+        :return: Append cost to go to system and controller states and return x_u_ctg
         """
-        xu = np.hsplit(xu, [self.x.size])
-        x = xu[0]
-        u = xu[1]
+        xu_split = np.hsplit(xu, [self.x.size])
+        x = xu_split[0]
+        u = xu_split[1]
 
-        # ----- EDIT COST FUNCTION HERE ----- #
+        # ----- EDIT COST FUNCTION BELOW ----- #
         def cost(x_row):
             return sum(abs(xi) for xi in x_row)
+        # ----- EDIT COST FUNCTION ABOVE ----- #
 
-        ctg = []
+        cost_to_go = []
+
         for t in range(x.shape[0]):
             if t == 0:
-                ctg.append(cost(x[t]))
+                cost_to_go.append(cost(x[t]))
             else:
-                ctg.append(cost(x[t]))
-                ctg[t-1] += ctg[t]
-        ctg = np.array(ctg).transpose()
+                cost_to_go.append(cost(x[t]))
+                cost_to_go[t-1] += cost_to_go[t]
 
-        return ctg
+        cost_to_go = np.array(cost_to_go).transpose()
+        x_u_ctg = np.hstack((xu, cost_to_go.reshape(xu.shape[0], 1)))
+
+        return x_u_ctg
 
     def simulate(self, duration, integrator="casadi", controls=None, ctrl_constraints=None):
         """
@@ -241,27 +247,35 @@ class System:
     #         print(self.x)
     #         return
 
-    def plot(self, x_u_ctg, plot_x=True, plot_u=True, plot_ctg=False):
+    def plot(self, x_u_ctg, plot_x=True, plot_u=True, plot_ctg=True):
         assert x_u_ctg.ndim == 2
         if plot_x:
             for i in range(self.x.size):
-                plt.plot(x_u_ctg[:, i], label='x{}'.format(i))
+                plt.plot(x_u_ctg[:, i], label="x{}".format(i))
         if plot_u:
             for j in range(self.u.size):
-                plt.plot(x_u_ctg[:, j+self.x.size], label='u{}'.format(j))
+                plt.plot(x_u_ctg[:, j+self.x.size], label="u{}".format(j))
         if plot_ctg:
-            plt.plot(x_u_ctg[:, -1], label='ctg')
+            plt.plot(x_u_ctg[:, -1], label="ctg")
 
         plt.xlabel("Time")
         plt.legend()
-        plt.savefig("sys_plot.svg", format="svg")
+        plt.savefig(plots_folder + "system_plot.svg", format="svg")
         plt.show()
+
+    def save_results(self, x_u_ctg):
+        df_col_names = []
+        df_col_names.extend("x_{}".format(i) for i in range(self.A.shape[1]))
+        df_col_names.extend("u_{}".format(i) for i in range(self.B.shape[1]))
+        df_col_names.extend(["ctg"])
+
+        df_system_x_u_ctg = pd.DataFrame(x_u_ctg, columns=df_col_names)
+        df_system_x_u_ctg.to_csv(results_folder + "system_x_u_ctg.csv")
 
 
 if __name__ == "__main__":
-    system = System("/matrices/xi.csv", "/matrices/A.csv", "/matrices/B.csv", "/matrices/C.csv")
-    results = system.simulate(500)
-    ctg = system.calc_ctg(results)
-    results = np.hstack((results, ctg.reshape(results.shape[0], 1)))
-    np.savetxt('/results_csv/results.csv', results, delimiter=',')
-    system.plot(results)
+    system = System("matrices/xi.csv", "matrices/A.csv", "matrices/B.csv", "matrices/C.csv")
+    res_x_u = system.simulate(10)
+    res_x_u_ctg = system.calc_ctg(res_x_u)
+    system.save_results(res_x_u_ctg)
+    system.plot(res_x_u_ctg)

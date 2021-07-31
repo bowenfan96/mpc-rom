@@ -10,6 +10,9 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 
+results_folder = "results_csv/"
+plots_folder = "results_plots/"
+
 
 class MPC:
     def __init__(self, xi_csv, a_csv, b_csv, duration):
