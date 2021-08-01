@@ -43,7 +43,7 @@ class MPC:
         # If we are generating data to train the model reduction neural net,
         # then initial x_i is randomly generated
         if gen_data:
-            self.x = np.random.randint(low=0, high=10000, size=self.A.shape[0])
+            self.x = np.random.randint(low=-10000, high=10000, size=self.A.shape[0])
         else:
             self.x = np.genfromtxt(xi_csv, delimiter=',')
         assert self.x.ndim == 1
