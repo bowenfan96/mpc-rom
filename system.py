@@ -158,11 +158,9 @@ class System:
         cost_to_go = []
 
         for t in range(x.shape[0]):
-            if t == 0:
-                cost_to_go.append(cost(x[t]))
-            else:
-                cost_to_go.append(cost(x[t]))
-                cost_to_go[t-1] += cost_to_go[t]
+            cost_to_go.append(cost(x[t]))
+        for t in reversed(range(x.shape[0]-1)):
+            cost_to_go[t] += cost_to_go[t+1]
 
         cost_to_go = np.array(cost_to_go).transpose()
         x_u_ctg = np.hstack((xu, cost_to_go.reshape(xu.shape[0], 1)))
