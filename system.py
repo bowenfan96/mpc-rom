@@ -5,6 +5,7 @@ import scipy.integrate
 import matplotlib.pyplot as plt
 import casadi
 
+matrices_folder = "matrices/"
 results_folder = "results_csv/"
 plots_folder = "results_plots/"
 
@@ -151,14 +152,16 @@ class System:
         u = xu_split[1]
 
         # ----- EDIT COST FUNCTION BELOW ----- #
-        def cost(x_row):
-            return sum(abs(xi) for xi in x_row)
+        def cost(x_row, u_row):
+            setpoint_cost = sum(abs(xi) for xi in x_row)
+            controller_cost = sum(abs(ui) for ui in u_row)
+            weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
+            return weighted_cost
         # ----- EDIT COST FUNCTION ABOVE ----- #
 
         cost_to_go = []
-
         for t in range(x.shape[0]):
-            cost_to_go.append(cost(x[t]))
+            cost_to_go.append(cost(x[t], u[t]))
         for t in reversed(range(x.shape[0]-1)):
             cost_to_go[t] += cost_to_go[t+1]
 
