@@ -234,6 +234,8 @@ class MOR:
 
         return self
 
+    # TODO: SCALE BACK ALL THE MINMAXSCALED VARIABLES LOL
+
     def predict_ctg(self, x_rom, u_rom):
         """
         This function is meant to be called externally by the controller
