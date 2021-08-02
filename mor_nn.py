@@ -255,6 +255,12 @@ class MOR:
             u_pred = self.model_reducer.u_decoder(u_rom)
         return u_pred
 
+    def encode_x(self, x_full):
+        x_full = torch.tensor(np.array(x_full))
+        with torch.no_grad():
+            x_rom = self.model_reducer.x_mor(x_full)
+        return x_rom
+
 
 def train():
     data = pd.read_csv(results_folder + "mpc_x_u_ctg.csv", sep=','

@@ -5,6 +5,7 @@ import numpy as np
 
 import pickle
 # Import mor_nn namespace for pickle to work
+import mor_nn
 from mor_nn import *
 
 import pymoo
@@ -128,24 +129,40 @@ class DeapOpt():
 
 
 class NnController:
-    def __init__(self, x_k_init, optimizer='deap'):
+    def __init__(self, x_k_init=None, optimizer='deap'):
         # Load pickle neural net
         with open('mor_nn.pickle', 'rb') as model:
             self.mor_nn = pickle.load(model)
 
-        if optimizer == 'gd':
+        # Initial reduced state variables, x_k_tilde (CAN REMOVE I THINK)
+        self.x_k = x_k_init
+
+        self.optimizer = optimizer
+        if self.optimizer == 'gd':
             self.opt = GdOpt(self.mor_nn)
-            results = self.opt.scipy_opt(np.random.rand(2))
-
-            print(results)
-
-        elif optimizer == 'deap':
+        elif self.optimizer == 'deap':
             x_k = np.zeros(2)
             self.opt = DeapOpt(x_k, self.mor_nn)
-            self.opt.optimize()
 
-        # Initial reduced state variables, x_k_tilde
-        self.x_k = x_k_init
+    def get_controls(self, x_full):
+        """
+        Get best control action given full state variables x
+        :param x_full: Full set of state variables
+        :return: Optimal control actions in full controller variables
+        """
+        # 1. Get x_tilde from x_full by passing through the neural net
+        x_tilde = self.mor_nn.encode_x(x_full)
+
+        # 2. Get optimal controls given x_tilde
+        if self.optimizer == 'gd':
+            u_tilde_opt = self.opt.scipy_opt(np.random.rand(2))
+        elif self.optimizer == 'deap':
+            u_tilde_opt = self.opt.optimize()
+
+        # 3. Decode optimal u_tilde into full set of controls
+        u_full_opt = self.mor_nn.decode_u(u_tilde_opt)
+
+        return u_full_opt
 
 
 if __name__ == "__main__":
