@@ -54,6 +54,9 @@ class DeapOpt():
         self.x_k = x_k_init
         self.toolbox = base.Toolbox()
 
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+        creator.create("Individual", list, fitness=creator.FitnessMin)
+
         # Number of genes in an individual (dimension of u_tilde)
         IND_SIZE = 2
         self.toolbox.register("attribute", random.random)
@@ -93,7 +96,7 @@ class DeapOpt():
             # Select the next generation individuals
             offspring = self.toolbox.select(pop, len(pop))
             # Clone the selected individuals
-            offspring = map(self.toolbox.clone, offspring)
+            offspring = list(map(self.toolbox.clone, offspring))
 
             # Apply crossover and mutation on the offspring
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -117,7 +120,11 @@ class DeapOpt():
             pop[:] = offspring
 
         print(pop)
-        return pop
+        print("Best individuals")
+        best_ind = tools.selBest(pop, 1)[0]
+        print(best_ind)
+
+        return best_ind
 
 
 class NnController:
@@ -135,6 +142,7 @@ class NnController:
         elif optimizer == 'deap':
             x_k = np.zeros(2)
             self.opt = DeapOpt(x_k, self.mor_nn)
+            self.opt.optimize()
 
         # Initial reduced state variables, x_k_tilde
         self.x_k = x_k_init
