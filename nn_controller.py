@@ -155,9 +155,9 @@ class NnController:
 
         # 2. Get optimal controls given x_tilde
         if self.optimizer == 'gd':
-            u_tilde_opt = self.opt.scipy_opt(np.random.rand(2))
+            u_tilde_opt = self.opt.scipy_opt(x_tilde)
         elif self.optimizer == 'deap':
-            u_tilde_opt = self.opt.optimize()
+            u_tilde_opt = self.opt.optimize(x_tilde)
 
         # 3. Decode optimal u_tilde into full set of controls
         u_full_opt = self.mor_nn.decode_u(u_tilde_opt)
