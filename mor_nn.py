@@ -16,6 +16,10 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn import preprocessing
 
+matrices_folder = "matrices/"
+results_folder = "results_csv/"
+plots_folder = "results_plots/"
+
 # Neural net structure:
 # x1, x2, x3, etc > i1, i2, etc
 # u1, u2, u3, etc > j1, j2, etc
@@ -132,7 +136,7 @@ class MOR:
 
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
-            self.num_epoch = 10
+            self.num_epoch = 100
             self.batch_size = 5
             self.learning_rate = 0.05
             # Desired dimension of reduced model
@@ -253,7 +257,7 @@ class MOR:
 
 
 def train():
-    data = pd.read_csv("results.csv", sep=','
+    data = pd.read_csv(results_folder + "mpc_x_u_ctg.csv", sep=','
                        # , usecols=["x_0", "x_1", "x_2", "x_3"]
                        )
     print(data)
