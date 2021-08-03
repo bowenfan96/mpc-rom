@@ -127,12 +127,12 @@ class MPC:
         #     return weighted_cost
 
         # HEAT EQUATION OBJECTIVE: BRING ELEMENT 133 TO 50 DEGREES AND MINIMIZE CONTROLLER COST (HEAT APPLIED)
-        self.model.setpoint = Constraint(rule=self.model.x[133, 10] == 50)
+        # self.model.setpoint = Constraint(rule=self.model.x[133, 10] == 50)
         def obj_rule(m):
-            setpoint_cost = sum((50 - m.x[133, t])**2 for t in m.time)
+            setpoint_cost = sum((50 - m.x[133, t]) for t in m.time)
             controller_cost = sum(m.u[t] for t in m.time)
             # Edit weights for setpoint and controller costs
-            weighted_cost = 1.00*setpoint_cost + 0.00*controller_cost
+            weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
             return weighted_cost
 
         self.model.obj = Objective(
@@ -178,7 +178,7 @@ class MPC:
         Simulated system state variables (sys_x) if simulating the system
         """
         # opt = SolverFactory('ipopt', tee=True)
-        # # https://coin-or.github.io/Ipopt/OPTIONS.html
+        # https://coin-or.github.io/Ipopt/OPTIONS.html
         # opt.options['max_iter'] = 10000
         # opt.options['print_level'] = 12
 
@@ -220,6 +220,8 @@ class MPC:
         else:
             results = opt.solve(self.model)
             self.model.display()
+            print("U RESULTS")
+            print(self.model.u)
 
             # Record values at intervals of 1 timestep
             # Necessary as discretizer is more granular than our step size
