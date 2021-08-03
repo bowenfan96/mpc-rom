@@ -18,7 +18,7 @@ plots_folder = "results_plots/"
 
 
 class MPC:
-    def __init__(self, xi_csv, a_csv, b_csv, duration, ncp, gen_data=True):
+    def __init__(self, xi_csv, a_csv, b_csv, duration, ncp, gen_data=False):
         """
         x_dot = Ax + Bu
         :param xi_csv: Initial system state
@@ -53,6 +53,9 @@ class MPC:
         now = datetime.datetime.now()
         self.runtime = str(now.day) + str(now.hour) + str(now.minute) + str(now.second)
 
+        # E MATRIX FOR CHAHLAOUI MODELS INCLUDING HEAT EQUATION
+        self.E = np.genfromtxt(matrices_folder + "E.csv", delimiter=',')
+
         # ----- BEGIN PYOMO CODE ----- #
         # Initialize pyomo model
         self.model = ConcreteModel()
@@ -62,12 +65,17 @@ class MPC:
         self.model.time = ContinuousSet(
             bounds=(0, self.duration), initialize=self.timesteps)
 
+        # Pyomo RangeSet includes both first and last
+        # Pyomo defaults sets to 1-indexing so we force 0-indexing
         self.model.I = RangeSet(0, self.A.shape[1]-1)
-        self.model.J = RangeSet(0, self.B.shape[1]-1)
+        # J is turned off if only 1 controller
+        # self.model.J = RangeSet(0, self.B.shape[1]-1)
+
         self.model.x = Var(self.model.I, self.model.time, initialize=0)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
 
-        self.model.u = Var(self.model.J, self.model.time, initialize=0)
+        # self.model.u = Var(self.model.J, self.model.time, initialize=0)
+        self.model.u = Var(self.model.time, initialize=0)
 
         # Edit finite element step size here
         self.discretizer = TransformationFactory('dae.collocation')
@@ -78,23 +86,49 @@ class MPC:
         def ode_Ax(m, i, t):
             return sum((m.x[j, t] * self.A[i][j]) for j in range(self.A.shape[1]))
 
+        # WHEN WE HAVE MORE THAN 1 CONTROLLER
+        # def ode_Bu(m, i, t):
+        #     return sum((m.u[j, t] * self.B[i][j]) for j in range(self.B.shape[1]))
+
+        # WHEN WE HAVE 1 CONTROLLER ONLY
         def ode_Bu(m, i, t):
-            return sum((m.u[j, t] * self.B[i][j]) for j in range(self.B.shape[1]))
+            return m.u[t] * self.B[i]
 
         self.model.ode = ConstraintList()
+
+        # FOR GENERAL X_DOT = AX + BU
+        # for time in self.model.time:
+        #     for i in range(self.A.shape[0]):
+        #         self.model.ode.add(
+        #             self.model.x_dot[i, time] == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
+        #         )
+        #         # Fix variables based on initial values
+        #         self.model.x[i, 0].fix(self.x[i])
+
+        # FOR HEAT EQUATION EX_DOT = AX + BU
+        def ode_Exdot(m, i, t):
+            return sum((m.x_dot[j, t] * self.E[i][j]) for j in range(self.A.shape[1]))
 
         for time in self.model.time:
             for i in range(self.A.shape[0]):
                 self.model.ode.add(
-                    self.model.x_dot[i, time] == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
+                    ode_Exdot(self.model, i, time) == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
                 )
                 # Fix variables based on initial values
                 self.model.x[i, 0].fix(self.x[i])
 
-        # Objective: Bring the entire system to zero AND minimize controller cost
+        # (OLD) Objective: Bring the entire system to zero AND minimize controller cost
+        # def obj_rule(m):
+        #     setpoint_cost = sum(abs(m.x[i]) for i in m.I * m.time)
+        #     controller_cost = sum(abs(m.u[j]) for j in m.J * m.time)
+        #     # Edit weights for setpoint and controller costs
+        #     weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
+        #     return weighted_cost
+
+        # HEAT EQUATION OBJECTIVE: BRING ELEMENT 133 TO 50 DEGREES AND MINIMIZE CONTROLLER COST (HEAT APPLIED)
         def obj_rule(m):
-            setpoint_cost = sum(abs(m.x[i]) for i in m.I * m.time)
-            controller_cost = sum(abs(m.u[j]) for j in m.J * m.time)
+            setpoint_cost = sum(abs(m.x[133, t]) for t in m.time)
+            controller_cost = sum(abs(m.u[t]) for t in m.time)
             # Edit weights for setpoint and controller costs
             weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
             return weighted_cost
@@ -142,7 +176,9 @@ class MPC:
         Simulated system state variables (sys_x) if simulating the system
         """
         opt = SolverFactory('ipopt', tee=True)
+        # https://coin-or.github.io/Ipopt/OPTIONS.html
         opt.options['max_iter'] = 10000
+        opt.options['print_level'] = 12
         results = None
 
         mpc_state = []
