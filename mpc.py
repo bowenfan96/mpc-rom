@@ -69,14 +69,17 @@ class MPC:
         # Pyomo RangeSet includes both first and last
         # Pyomo defaults sets to 1-indexing so we force 0-indexing
         self.model.I = RangeSet(0, self.A.shape[1]-1)
+
         # J is turned off if only 1 controller
-        # self.model.J = RangeSet(0, self.B.shape[1]-1)
+        self.model.J = RangeSet(0, self.B.shape[1]-1)
 
         self.model.x = Var(self.model.I, self.model.time, initialize=0)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
 
-        # self.model.u = Var(self.model.J, self.model.time, initialize=0)
-        self.model.u = Var(self.model.time, initialize=0)
+        # More than 1 controller
+        self.model.u = Var(self.model.J, self.model.time, initialize=0)
+        # 1 controller
+        # self.model.u = Var(self.model.time, initialize=0)
 
         # Edit finite element step size here
         self.discretizer = TransformationFactory('dae.collocation')
@@ -88,12 +91,12 @@ class MPC:
             return sum((m.x[j, t] * self.A[i][j]) for j in range(self.A.shape[1]))
 
         # WHEN WE HAVE MORE THAN 1 CONTROLLER
-        # def ode_Bu(m, i, t):
-        #     return sum((m.u[j, t] * self.B[i][j]) for j in range(self.B.shape[1]))
+        def ode_Bu(m, i, t):
+            return sum((m.u[j, t] * self.B[i][j]) for j in range(self.B.shape[1]))
 
         # WHEN WE HAVE 1 CONTROLLER ONLY
-        def ode_Bu(m, i, t):
-            return m.u[t] * self.B[i]
+        # def ode_Bu(m, i, t):
+        #     return m.u[t] * self.B[i]
 
         self.model.ode = ConstraintList()
 
@@ -127,12 +130,12 @@ class MPC:
         #     return weighted_cost
 
         # HEAT EQUATION OBJECTIVE: BRING ELEMENT 133 TO 50 DEGREES AND MINIMIZE CONTROLLER COST (HEAT APPLIED)
-        # self.model.setpoint = Constraint(rule=self.model.x[133, 10] == 50)
+        # self.model.controller_bounds = Constraint(rule=0 < self.model.u[] < 100)
         def obj_rule(m):
-            setpoint_cost = sum((50 - m.x[133, t]) for t in m.time)
-            controller_cost = sum(m.u[t] for t in m.time)
+            setpoint_cost = sum((500 - m.x[133, t])**2 for t in m.time)
+            controller_cost = sum((m.u[j])**2 for j in m.J * m.time)
             # Edit weights for setpoint and controller costs
-            weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
+            weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
             return weighted_cost
 
         self.model.obj = Objective(
@@ -149,20 +152,22 @@ class MPC:
         """
         # ----- EDIT COST FUNCTION BELOW ----- #
         def cost(x_row, u_row):
-            setpoint_cost = sum(abs(xi) for xi in x_row)
-            controller_cost = sum(abs(ui) for ui in u_row)
-            weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
+            setpoint_cost = sum((500 - xi)**2 for xi in x_row)
+            controller_cost = sum(ui**2 for ui in u_row)
+            # controller_cost = u_row ** 2
+            weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
             return weighted_cost
         # ----- EDIT COST FUNCTION ABOVE ----- #
 
         # If duration is 100, there should be 101 entries as initial x0 and u0 are included
-        assert x.shape[0] == self.duration + 1
-        assert u.shape[0] == self.duration + 1
+        # TURN OFF TO RECORD COLLOCATION POINTS AS DATA
+        # assert x.shape[0] == self.duration + 1
+        # assert u.shape[0] == self.duration + 1
 
         cost_to_go = []
-        for t in range(self.duration+1):
+        for t in range(x.shape[0]):
             cost_to_go.append(cost(x[t], u[t]))
-        for t in reversed(range(self.duration)):
+        for t in reversed(range(x.shape[0] - 1)):
             cost_to_go[t] += cost_to_go[t+1]
 
         cost_to_go = np.array(cost_to_go).reshape(-1, 1)
@@ -177,12 +182,12 @@ class MPC:
         :return: MPC state variables (mpc_x), MPC control actions (u), Cost to go,
         Simulated system state variables (sys_x) if simulating the system
         """
-        # opt = SolverFactory('ipopt', tee=True)
+        opt = SolverFactory('ipopt', tee=True)
         # https://coin-or.github.io/Ipopt/OPTIONS.html
         # opt.options['max_iter'] = 10000
         # opt.options['print_level'] = 12
 
-        opt = SolverFactory("gurobi", solver_io="python")
+        # opt = SolverFactory("gurobi", solver_io="python")
 
         results = None
 
@@ -220,18 +225,16 @@ class MPC:
         else:
             results = opt.solve(self.model)
             self.model.display()
-            print("U RESULTS")
-            print(value(self.model.u))
 
             # Record values at intervals of 1 timestep
             # Necessary as discretizer is more granular than our step size
             for time in self.model.time:
-                if float(time).is_integer():
+                # if float(time).is_integer():
                     mpc_state.append(list(value(self.model.x[:, time])))
                     # FOR 1 CONTROLLER ONLY
-                    mpc_action.append(list(value(self.model.u[time])))
+                    # mpc_action.append(value(self.model.u[time]))
                     # FOR MORE THAN 1 CONTROLLER
-                    # mpc_action.append(list(value(self.model.u[:, time])))
+                    mpc_action.append(list(value(self.model.u[:, time])))
 
         # Output error if solution cannot be found, otherwise solver should print "ok"
         print(results.solver.status)
@@ -322,7 +325,7 @@ if __name__ == "__main__":
     mpc = MPC(matrices_folder + "xi.csv",
               matrices_folder + "A.csv",
               matrices_folder + "B.csv",
-              duration=10, ncp=3)
+              duration=20, ncp=3)
 
     mpc_x, u, v = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state=mpc_x, mpc_action=u, ctg=v)
