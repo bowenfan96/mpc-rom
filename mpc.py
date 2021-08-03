@@ -1,4 +1,5 @@
 # Import Pyomo classes
+import pyomo.environ
 from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
@@ -126,11 +127,12 @@ class MPC:
         #     return weighted_cost
 
         # HEAT EQUATION OBJECTIVE: BRING ELEMENT 133 TO 50 DEGREES AND MINIMIZE CONTROLLER COST (HEAT APPLIED)
+        self.model.setpoint = Constraint(rule=self.model.x[133, 10] == 50)
         def obj_rule(m):
-            setpoint_cost = sum(abs(m.x[133, t]) for t in m.time)
-            controller_cost = sum(abs(m.u[t]) for t in m.time)
+            setpoint_cost = sum((50 - m.x[133, t])**2 for t in m.time)
+            controller_cost = sum(m.u[t] for t in m.time)
             # Edit weights for setpoint and controller costs
-            weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
+            weighted_cost = 1.00*setpoint_cost + 0.00*controller_cost
             return weighted_cost
 
         self.model.obj = Objective(
@@ -175,10 +177,13 @@ class MPC:
         :return: MPC state variables (mpc_x), MPC control actions (u), Cost to go,
         Simulated system state variables (sys_x) if simulating the system
         """
-        opt = SolverFactory('ipopt', tee=True)
-        # https://coin-or.github.io/Ipopt/OPTIONS.html
-        opt.options['max_iter'] = 10000
-        opt.options['print_level'] = 12
+        # opt = SolverFactory('ipopt', tee=True)
+        # # https://coin-or.github.io/Ipopt/OPTIONS.html
+        # opt.options['max_iter'] = 10000
+        # opt.options['print_level'] = 12
+
+        opt = SolverFactory("gurobi", solver_io="python")
+
         results = None
 
         mpc_state = []
@@ -221,7 +226,10 @@ class MPC:
             for time in self.model.time:
                 if float(time).is_integer():
                     mpc_state.append(list(value(self.model.x[:, time])))
-                    mpc_action.append(list(value(self.model.u[:, time])))
+                    # FOR 1 CONTROLLER ONLY
+                    mpc_action.append(list(value(self.model.u[time])))
+                    # FOR MORE THAN 1 CONTROLLER
+                    # mpc_action.append(list(value(self.model.u[:, time])))
 
         # Output error if solution cannot be found, otherwise solver should print "ok"
         print(results.solver.status)
@@ -312,7 +320,7 @@ if __name__ == "__main__":
     mpc = MPC(matrices_folder + "xi.csv",
               matrices_folder + "A.csv",
               matrices_folder + "B.csv",
-              duration=50, ncp=3)
+              duration=10, ncp=3)
 
     mpc_x, u, v = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state=mpc_x, mpc_action=u, ctg=v)
