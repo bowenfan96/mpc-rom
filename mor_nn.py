@@ -193,7 +193,7 @@ class MOR:
         u_scaled = self.u_scaler.transform(u)
         self.ctg_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
         self.ctg_scaler.fit(ctg)
-        ctg_scaled = self.ctg_scaler.transform(u)
+        ctg_scaled = self.ctg_scaler.transform(ctg)
 
         x_scaled_tensor = torch.tensor(x_scaled)
         u_scaled_tensor = torch.tensor(u_scaled)
@@ -295,7 +295,7 @@ class MOR:
 
 
 def train():
-    data = pd.read_csv(results_folder + "mpc_x_u_ctg.csv", sep=','
+    data = pd.read_csv(results_folder + "mpc_x_u_ctg46586.csv", sep=','
                        # , usecols=["x_0", "x_1", "x_2", "x_3"]
                        )
     print(data)
