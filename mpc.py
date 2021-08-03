@@ -12,7 +12,7 @@ import pandas as pd
 
 import datetime
 
-matrices_folder = "matrices/"
+matrices_folder = "matrices/heateqn/"
 results_folder = "results_csv/"
 plots_folder = "results_plots/"
 

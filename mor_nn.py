@@ -34,66 +34,83 @@ class Xnn(nn.Module):
     def __init__(self, x_dim, x_rom):
         super(Xnn, self).__init__()
         # Neural net structure: xi > ki > zi
-        self.k_x = nn.Linear(x_dim, (x_dim + x_rom) // 2)
-        self.z_x = nn.Linear((x_dim + x_rom) // 2, x_rom)
+        self.x_input_layer = nn.Linear(x_dim, (x_dim + x_rom) // 2)
+        self.x_hidden_layer = nn.Linear((x_dim + x_rom) // 2, (x_dim + x_rom) // 2)
+        self.x_rom_layer = nn.Linear((x_dim + x_rom) // 2, x_rom)
 
-        nn.init.kaiming_uniform_(self.k_x.weight)
-        nn.init.kaiming_uniform_(self.z_x.weight)
+        nn.init.kaiming_uniform_(self.x_input_layer.weight)
+        nn.init.kaiming_uniform_(self.x_hidden_layer.weight)
+        nn.init.kaiming_uniform_(self.x_rom_layer.weight)
 
     def forward(self, x_in):
         # x_in = torch.flatten(data, start_dim=1)
-        # Input to intermediate layer activation
-        x_k = F.leaky_relu(self.k_x(x_in))
-        # Intermediate to compressed layer
-        x_z = F.leaky_relu(self.z_x(x_k))
-        return x_z
+        # Hidden 1 activation
+        x_h1 = F.leaky_relu(self.x_input_layer(x_in))
+        # Hidden 2 activation
+        x_h2 = F.leaky_relu(self.x_hidden_layer(x_h1))
+        # Output - No activation
+        x_rom = self.x_rom_layer(x_h2)
+        return x_rom
 
 
 class Unn(nn.Module):
     def __init__(self, u_dim, u_rom):
         super(Unn, self).__init__()
-        self.k_u = nn.Linear(u_rom, (u_dim + u_rom) // 2)
-        self.z_u = nn.Linear((u_dim + u_rom) // 2, u_dim)
+        self.u_input_layer = nn.Linear(u_rom, (u_dim + u_rom) // 2)
+        self.u_hidden_layer = nn.Linear((u_dim + u_rom) // 2, (u_dim + u_rom) // 2)
+        self.u_rom_layer = nn.Linear((u_dim + u_rom) // 2, u_dim)
 
-        nn.init.kaiming_uniform_(self.k_u.weight)
-        nn.init.kaiming_uniform_(self.z_u.weight)
+        nn.init.kaiming_uniform_(self.u_input_layer.weight)
+        nn.init.kaiming_uniform_(self.u_hidden_layer.weight)
+        nn.init.kaiming_uniform_(self.u_rom_layer.weight)
 
     def forward(self, u_in):
-        u_k = F.leaky_relu(self.k_u(u_in))
-        u_z = F.leaky_relu(self.z_u(u_k))
-        return u_z
+        # Hidden 1 activation
+        u_h1 = F.leaky_relu(self.x_input_layer(u_in))
+        # Hidden 2 activation
+        u_h2 = F.leaky_relu(self.x_hidden_layer(u_h1))
+        # Output - No activation
+        u_rom = self.x_rom_layer(u_h2)
+        return u_rom
 
 
 class UnnDecoder(nn.Module):
     def __init__(self, u_dim, u_rom):
         super(UnnDecoder, self).__init__()
         self.o1_u = nn.Linear(u_dim, (u_dim + u_rom) // 2)
-        self.o2_u = nn.Linear((u_dim + u_rom) // 2, u_dim)
+        self.o2_u = nn.Linear((u_dim + u_rom) // 2, (u_dim + u_rom) // 2)
+        self.o3_u = nn.Linear((u_dim + u_rom) // 2, u_dim)
 
         nn.init.kaiming_uniform_(self.o1_u.weight)
         nn.init.kaiming_uniform_(self.o2_u.weight)
+        nn.init.kaiming_uniform_(self.o3_u.weight)
 
     def forward(self, u_rom_in):
         u_out1 = F.leaky_relu(self.o1_u(u_rom_in))
         u_out2 = F.leaky_relu(self.o2_u(u_out1))
-        return u_out2
+        u_out3 = self.o3_u(u_out2)
+        # Return decoded u
+        return u_out3
 
 
 class CtgNn(nn.Module):
     def __init__(self, x_rom, u_rom):
         super(CtgNn, self).__init__()
-        self.xu1 = nn.Linear((x_rom + u_rom), ((x_rom + u_rom + 1) // 2))
+        self.ctg1 = nn.Linear((x_rom + u_rom), ((x_rom + u_rom + 1) // 2))
+        self.ctg2 = nn.Linear((x_rom + u_rom + 1) // 2, (x_rom + u_rom + 1) // 2)
         # Output is just 1 column - the cost to go value
-        self.xu2 = nn.Linear(((x_rom + u_rom + 1) // 2), 1)
+        self.ctg3 = nn.Linear((x_rom + u_rom + 1) // 2, 1)
 
-        nn.init.kaiming_uniform_(self.xu1.weight)
-        nn.init.kaiming_uniform_(self.xu2.weight)
+        nn.init.kaiming_uniform_(self.ctg1.weight)
+        nn.init.kaiming_uniform_(self.ctg2.weight)
+        nn.init.kaiming_uniform_(self.ctg3.weight)
 
     def forward(self, x_rom, u_rom):
         # Predict cost to go
         xu_rom_in = torch.hstack((x_rom, u_rom))
-        xu_rom_out = F.leaky_relu(self.xu1(xu_rom_in))
-        ctg_pred = F.leaky_relu(self.xu2(xu_rom_out))
+        xu_rom_out1 = F.leaky_relu(self.ctg1(xu_rom_in))
+        xu_rom_out2 = F.leaky_relu(self.ctg2(xu_rom_out1))
+        ctg_pred = self.ctg3(xu_rom_out2)
         return ctg_pred
 
 
@@ -220,6 +237,7 @@ class MOR:
                 # Loss is the loss of both ctg and decoded u
                 loss_ctg = criterion(ctg_pred, ctg_mb)
                 loss_u = criterion(u_decoded, u_mb)
+                # https://discuss.pytorch.org/t/what-does-the-backward-function-do/9944
                 loss = loss_ctg + loss_u
                 loss.backward()
 
@@ -254,16 +272,23 @@ class MOR:
         u_rom = torch.tensor(np.array(u_rom), dtype=torch.float)
         with torch.no_grad():
             ctg_pred = self.model_reducer.ctg(x_rom, u_rom)
+        # Scale back ctg
+        ctg_pred = self.ctg_scaler.inverse_transform(ctg_pred)
         return ctg_pred
 
     def decode_u(self, u_rom):
         u_rom = torch.tensor(np.array(u_rom))
         with torch.no_grad():
             u_pred = self.model_reducer.u_decoder(u_rom)
+        # Scale back u
+        u_pred = self.u_scaler.inverse_transform(u_pred)
         return u_pred
 
     def encode_x(self, x_full):
-        x_full = torch.tensor(np.array(x_full))
+        # Scale x
+        x_full = np.array(x_full)
+        x_full = self.x_scaler.transform(x_full)
+        x_full = torch.tensor(x_full)
         with torch.no_grad():
             x_rom = self.model_reducer.x_mor(x_full)
         return x_rom
