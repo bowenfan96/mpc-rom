@@ -247,6 +247,7 @@ class MPC:
         :param ctg: cost to go
         :return: Save a nice graph
         """
+        print("PLOTTER CALLED")
         # To fix empty subplot blank space problem
         if sys_state is not None:
             fig, axs = plt.subplots(4)
