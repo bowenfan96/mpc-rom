@@ -155,8 +155,7 @@ class MOR:
         # Initialise neural net
         self.model_reducer = ObjNn(self.x_dim, self.x_rom, self.u_dim, self.u_rom)
 
-    @staticmethod
-    def process_data(data):
+    def process_data(self, data):
         # Split x, u and cost to go columns
         x = data.filter(regex='x_')
         u = data.filter(regex='u_')
@@ -169,9 +168,15 @@ class MOR:
         ctg = ctg.to_numpy(dtype=np.float32)
 
         # Scale all variables to between 0 and 1 (suitable for Relu)
-        x_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(x)
-        u_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(u)
-        ctg_scaled = preprocessing.MinMaxScaler(feature_range=(0, 1)).fit_transform(ctg)
+        self.x_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
+        self.x_scaler.fit(x)
+        x_scaled = self.x_scaler.transform(x)
+        self.u_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
+        self.u_scaler.fit(u)
+        u_scaled = self.u_scaler.transform(u)
+        self.ctg_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
+        self.ctg_scaler.fit(ctg)
+        ctg_scaled = self.ctg_scaler.transform(u)
 
         x_scaled_tensor = torch.tensor(x_scaled)
         u_scaled_tensor = torch.tensor(u_scaled)
