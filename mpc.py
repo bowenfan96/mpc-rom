@@ -221,7 +221,7 @@ class MPC:
             results = opt.solve(self.model)
             self.model.display()
             print("U RESULTS")
-            print(self.model.u)
+            print(value(self.model.u))
 
             # Record values at intervals of 1 timestep
             # Necessary as discretizer is more granular than our step size
