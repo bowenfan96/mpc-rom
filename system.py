@@ -5,7 +5,7 @@ import scipy.integrate
 import matplotlib.pyplot as plt
 import casadi
 
-matrices_folder = "matrices/"
+matrices_folder = "matrices/heateqn"
 results_folder = "results_csv/"
 plots_folder = "results_plots/"
 

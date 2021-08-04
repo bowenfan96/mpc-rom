@@ -1,5 +1,5 @@
 # Import Pyomo classes
-import pyomo.environ
+# import pyomo.environ
 from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
@@ -19,7 +19,7 @@ plots_folder = "results_plots/"
 
 
 class MPC:
-    def __init__(self, xi_csv, a_csv, b_csv, duration, ncp, gen_data=False):
+    def __init__(self, xi_csv, a_csv, b_csv, duration, ncp, gen_data=True):
         """
         x_dot = Ax + Bu
         :param xi_csv: Initial system state
@@ -44,7 +44,7 @@ class MPC:
         # If we are generating data to train the model reduction neural net,
         # then initial x_i is randomly generated
         if gen_data:
-            self.x = np.random.randint(low=-10000, high=10000, size=self.A.shape[0])
+            self.x = np.random.randint(low=0, high=100, size=self.A.shape[0])
         else:
             self.x = np.genfromtxt(xi_csv, delimiter=',')
         assert self.x.ndim == 1
@@ -73,11 +73,11 @@ class MPC:
         # J is turned off if only 1 controller
         self.model.J = RangeSet(0, self.B.shape[1]-1)
 
-        self.model.x = Var(self.model.I, self.model.time, initialize=0)
+        self.model.x = Var(self.model.I, self.model.time, domain=NonNegativeReals)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
 
         # More than 1 controller
-        self.model.u = Var(self.model.J, self.model.time, initialize=0)
+        self.model.u = Var(self.model.J, self.model.time, initialize=0, domain=NonNegativeReals)
         # 1 controller
         # self.model.u = Var(self.model.time, initialize=0)
 
@@ -129,18 +129,19 @@ class MPC:
         #     weighted_cost = 0.5*setpoint_cost + 0.5*controller_cost
         #     return weighted_cost
 
-        # HEAT EQUATION OBJECTIVE: BRING ELEMENT 133 TO 50 DEGREES AND MINIMIZE CONTROLLER COST (HEAT APPLIED)
-        def setpoint(m, t):
-            return m.x[133, 10] == 500
+        # # HEAT EQUATION OBJECTIVE: BRING ELEMENT 133 TO 50 DEGREES AND MINIMIZE CONTROLLER COST (HEAT APPLIED)
+        # def setpoint(m, t):
+        #     return m.x[133, 10] == 500
 
-        self.model.setpoint = Constraint(rule=setpoint)
+        # self.model.setpoint = Constraint(rule=setpoint)
 
         def obj_rule(m):
-            setpoint_cost = sum((500 - m.x[133, t])**2 for t in m.time)
-            controller_cost = sum((m.u[j])**2 for j in m.J * m.time)
+            setpoint_cost = sum((50 - m.x[133, t])**2 for t in m.time)
+            # controller_cost = sum((m.u[j])**2 for j in m.J * m.time)
             # Edit weights for setpoint and controller costs
-            weighted_cost = 0.80*setpoint_cost + 0.20*controller_cost
-            return weighted_cost
+            # weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
+            # return weighted_cost
+            return setpoint_cost
 
         self.model.obj = Objective(
             rule=obj_rule,
@@ -156,11 +157,12 @@ class MPC:
         """
         # ----- EDIT COST FUNCTION BELOW ----- #
         def cost(x_row, u_row):
-            setpoint_cost = sum((500 - xi)**2 for xi in x_row)
-            controller_cost = sum(ui**2 for ui in u_row)
+            setpoint_cost = sum((50 - xi)**2 for xi in x_row)
+            # controller_cost = sum(ui**2 for ui in u_row)
             # controller_cost = u_row ** 2
-            weighted_cost = 0.80*setpoint_cost + 0.20*controller_cost
-            return weighted_cost
+            # weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
+            # return weighted_cost
+            return setpoint_cost
         # ----- EDIT COST FUNCTION ABOVE ----- #
 
         # If duration is 100, there should be 101 entries as initial x0 and u0 are included
