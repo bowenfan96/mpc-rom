@@ -130,12 +130,16 @@ class MPC:
         #     return weighted_cost
 
         # HEAT EQUATION OBJECTIVE: BRING ELEMENT 133 TO 50 DEGREES AND MINIMIZE CONTROLLER COST (HEAT APPLIED)
-        # self.model.controller_bounds = Constraint(rule=0 < self.model.u[] < 100)
+        def setpoint(m, t):
+            return m.x[133, 10] == 500
+
+        self.model.setpoint = Constraint(rule=setpoint)
+
         def obj_rule(m):
             setpoint_cost = sum((500 - m.x[133, t])**2 for t in m.time)
             controller_cost = sum((m.u[j])**2 for j in m.J * m.time)
             # Edit weights for setpoint and controller costs
-            weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
+            weighted_cost = 0.80*setpoint_cost + 0.20*controller_cost
             return weighted_cost
 
         self.model.obj = Objective(
@@ -155,7 +159,7 @@ class MPC:
             setpoint_cost = sum((500 - xi)**2 for xi in x_row)
             controller_cost = sum(ui**2 for ui in u_row)
             # controller_cost = u_row ** 2
-            weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
+            weighted_cost = 0.80*setpoint_cost + 0.20*controller_cost
             return weighted_cost
         # ----- EDIT COST FUNCTION ABOVE ----- #
 
@@ -325,7 +329,7 @@ if __name__ == "__main__":
     mpc = MPC(matrices_folder + "xi.csv",
               matrices_folder + "A.csv",
               matrices_folder + "B.csv",
-              duration=20, ncp=3)
+              duration=10, ncp=3)
 
     mpc_x, u, v = mpc.solve(sim_sys=False)
     mpc.plot(mpc_state=mpc_x, mpc_action=u, ctg=v)
