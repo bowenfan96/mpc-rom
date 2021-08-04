@@ -66,11 +66,11 @@ class Unn(nn.Module):
 
     def forward(self, u_in):
         # Hidden 1 activation
-        u_h1 = F.leaky_relu(self.x_input_layer(u_in))
+        u_h1 = F.leaky_relu(self.u_input_layer(u_in))
         # Hidden 2 activation
-        u_h2 = F.leaky_relu(self.x_hidden_layer(u_h1))
+        u_h2 = F.leaky_relu(self.u_hidden_layer(u_h1))
         # Output - No activation
-        u_rom = self.x_rom_layer(u_h2)
+        u_rom = self.u_rom_layer(u_h2)
         return u_rom
 
 
@@ -153,11 +153,11 @@ class MOR:
 
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
-            self.num_epoch = 100
+            self.num_epoch = 1000
             self.batch_size = 5
-            self.learning_rate = 0.05
+            self.learning_rate = 0.005
             # Desired dimension of reduced model
-            self.x_rom = 2
+            self.x_rom = 14
             # Desired dimension of reduced model
             self.u_rom = 2
             self.is_tuning = False
@@ -166,7 +166,7 @@ class MOR:
         processed_data = self.process_data(data)
 
         # Input size is the same as output size
-        self.x_dim = 4
+        self.x_dim = 200
         self.u_dim = 2
 
         # Initialise neural net
@@ -257,7 +257,7 @@ class MOR:
 
         return self
 
-    # TODO: SCALE BACK ALL THE MINMAXSCALED VARIABLES LOL
+    # TODO: SCALE BACK ALL THE MINMAXSCALED VARIABLES LOL - DONE
 
     def predict_ctg(self, x_rom, u_rom):
         """
@@ -266,31 +266,44 @@ class MOR:
         :param u_rom:
         :return:
         """
+        print("Hi imma x_rom")
         print(x_rom)
+        print("Hi imma u_rom")
         print(u_rom)
         x_rom = torch.tensor(np.array(x_rom), dtype=torch.float)
         u_rom = torch.tensor(np.array(u_rom), dtype=torch.float)
         with torch.no_grad():
             ctg_pred = self.model_reducer.ctg(x_rom, u_rom)
+        # Convert back to numpy array
+        ctg_pred = ctg_pred.detach().numpy()
         # Scale back ctg
-        ctg_pred = self.ctg_scaler.inverse_transform(ctg_pred)
+        ctg_pred = self.ctg_scaler.inverse_transform(ctg_pred.reshape(1, -1))
+        ctg_pred = ctg_pred.flatten()
         return ctg_pred
 
     def decode_u(self, u_rom):
-        u_rom = torch.tensor(np.array(u_rom))
+        u_rom = torch.tensor(np.array(u_rom), dtype=torch.float)
+        print("hi im tensor urom")
+        print(u_rom)
         with torch.no_grad():
             u_pred = self.model_reducer.u_decoder(u_rom)
+        # Convert back to numpy array
+        u_pred = u_pred.detach().numpy()
+        print("hi imma upred")
+        print(u_pred)
         # Scale back u
-        u_pred = self.u_scaler.inverse_transform(u_pred)
+        u_pred = self.u_scaler.inverse_transform(u_pred.reshape(1, 2))
         return u_pred
 
     def encode_x(self, x_full):
         # Scale x
         x_full = np.array(x_full)
         x_full = self.x_scaler.transform(x_full)
-        x_full = torch.tensor(x_full)
+        x_full = torch.tensor(x_full, dtype=torch.float)
         with torch.no_grad():
             x_rom = self.model_reducer.x_mor(x_full)
+        # Convert back to numpy array
+        x_rom = x_rom.detach().numpy()
         return x_rom
 
 

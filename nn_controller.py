@@ -1,5 +1,6 @@
 import random
 
+import numpy
 import scipy.optimize
 import numpy as np
 
@@ -46,7 +47,9 @@ class GdOpt:
         :param x_k: x_k_tilde, the reduced state variables
         :return: Cost to go, predicted using the neural net
         """
-        ctg_pred = self.mor_nn.predict_ctg(x_k[0], u_k)
+        x_tilde = x_k[0]
+        x_tilde = x_tilde.flatten()
+        ctg_pred = self.mor_nn.predict_ctg(x_tilde, u_k)
         return ctg_pred
 
 
@@ -85,7 +88,7 @@ class DeapOpt():
         return ctg_pred
 
     def optimize(self):
-        pop = self.toolbox.population(n=50)
+        pop = self.toolbox.population(n=100)
         CXPB, MUTPB, NGEN = 0.5, 0.2, 40
 
         # Evaluate the entire population
@@ -141,7 +144,7 @@ class NnController:
         if self.optimizer == 'gd':
             self.opt = GdOpt(self.mor_nn)
         elif self.optimizer == 'deap':
-            x_k = np.zeros(2)
+            x_k = np.zeros(14)
             self.opt = DeapOpt(x_k, self.mor_nn)
 
     def get_controls(self, x_full):
@@ -152,18 +155,31 @@ class NnController:
         """
         # 1. Get x_tilde from x_full by passing through the neural net
         x_tilde = self.mor_nn.encode_x(x_full)
-
+        x_tilde = x_tilde.flatten()
+        print(x_tilde)
         # 2. Get optimal controls given x_tilde
         if self.optimizer == 'gd':
             u_tilde_opt = self.opt.scipy_opt(x_tilde)
         elif self.optimizer == 'deap':
-            u_tilde_opt = self.opt.optimize(x_tilde)
+            u_tilde_opt = self.opt.optimize()
+
+        u_tilde_opt = numpy.array(u_tilde_opt)
+        print("Hi im u tilde opt")
+        print(u_tilde_opt)
 
         # 3. Decode optimal u_tilde into full set of controls
         u_full_opt = self.mor_nn.decode_u(u_tilde_opt)
-
+        print("U FULL OPT")
+        print(u_full_opt)
         return u_full_opt
 
 
 if __name__ == "__main__":
-    controller = NnController(np.zeros(2))
+    controller = NnController()
+
+    print("test")
+    print(controller.mor_nn.decode_u([1,1]))
+    time.sleep(2)
+
+    print("RESULTS")
+    print(controller.get_controls(np.zeros(200).reshape(1, 200)))
