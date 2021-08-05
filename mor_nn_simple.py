@@ -16,9 +16,9 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn import preprocessing
 
-matrices_folder = "matrices/random_slicot/"
-results_folder = "results_csv/random_slicot/"
-plots_folder = "results_plots/random_slicot/"
+matrices_folder = "matrices/simple/"
+results_folder = "results_csv/simple/"
+plots_folder = "results_plots/simple/"
 
 # Neural net structure:
 # x1, x2, x3, etc > i1, i2, etc
@@ -96,10 +96,10 @@ class UnnDecoder(nn.Module):
 class CtgNn(nn.Module):
     def __init__(self, x_rom, u_rom):
         super(CtgNn, self).__init__()
-        self.ctg1 = nn.Linear((x_rom + u_rom), ((x_rom + u_rom + 1) // 2))
-        self.ctg2 = nn.Linear((x_rom + u_rom + 1) // 2, (x_rom + u_rom + 1) // 2)
+        self.ctg1 = nn.Linear((x_rom + u_rom), ((x_rom + u_rom + 1) * 2))
+        self.ctg2 = nn.Linear((x_rom + u_rom + 1) * 2, (x_rom + u_rom + 1))
         # Output is just 1 column - the cost to go value
-        self.ctg3 = nn.Linear((x_rom + u_rom + 1) // 2, 1)
+        self.ctg3 = nn.Linear((x_rom + u_rom + 1), 1)
 
         nn.init.kaiming_uniform_(self.ctg1.weight)
         nn.init.kaiming_uniform_(self.ctg2.weight)
@@ -379,7 +379,7 @@ def pickle_mor_nn(mor_nn_trained):
     """
     with open('mor_nn.pickle', 'wb') as model:
         pickle.dump(mor_nn_trained, model)
-    print("\nSaved model to mor_nn.pickle\n")
+    print("\nSaved model to mor_nn_simple.pickle\n")
 
 
 if __name__ == "__main__":
