@@ -206,7 +206,7 @@ class MPC:
             if self.num_output > 1:
                 setpoint_cost = sum((self.model.y[k] - 1000*k**2) ** 2 for k in m.K * m.time)
             else:
-                setpoint_cost = sum((self.model.y[t] - 1000*t**2) ** 2 for t in m.time)
+                setpoint_cost = sum((self.model.y[t] - 1000) ** 2 for t in m.time)
 
             # controller_cost = sum(sum((m.u[j, t+1] - m.u[j, t])**2
             #                           for t in range(duration-1))
@@ -316,7 +316,7 @@ class MPC:
         """
         # ----- EDIT COST FUNCTION BELOW ----- #
         def cost(x_row, u_row, y_row, time):
-            setpoint_cost = (y_row - 1000*t**2)**2
+            setpoint_cost = (y_row - 1000)**2
             # setpoint_cost = sum((50 - xi)**2 for xi in x_row)
             # controller_cost = sum(ui**2 for ui in u_row)
             controller_cost = u_row ** 2

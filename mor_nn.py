@@ -16,9 +16,9 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn import preprocessing
 
-matrices_folder = "matrices/"
-results_folder = "results_csv/"
-plots_folder = "results_plots/"
+matrices_folder = "matrices/random_slicot/"
+results_folder = "results_csv/random_slicot/"
+plots_folder = "results_plots/random_slicot/"
 
 # Neural net structure:
 # x1, x2, x3, etc > i1, i2, etc
@@ -110,28 +110,37 @@ class CtgNn(nn.Module):
         xu_rom_in = torch.hstack((x_rom, u_rom))
         xu_rom_out1 = F.leaky_relu(self.ctg1(xu_rom_in))
         xu_rom_out2 = F.leaky_relu(self.ctg2(xu_rom_out1))
-        ctg_pred = self.ctg3(xu_rom_out2)
+        ctg_pred = F.relu(self.ctg3(xu_rom_out2))
         return ctg_pred
 
 
-class ObjNn(nn.Module):
-    def __init__(self, x_dim, x_rom, u_dim, u_rom):
-        super(ObjNn, self).__init__()
+class MorNn(nn.Module):
+    def __init__(self, x_dim, x_rom, u_dim, u_rom, activate_u_nn=False):
+        super(MorNn, self).__init__()
         self.x_mor = Xnn(x_dim, x_rom)
-        self.u_mor = Unn(u_dim, u_rom)
-        self.u_decoder = UnnDecoder(u_dim, u_rom)
         self.ctg = CtgNn(x_rom, u_rom)
 
+        if activate_u_nn:
+            self.u_mor = Unn(u_dim, u_rom)
+            self.u_decoder = UnnDecoder(u_dim, u_rom)
+
+        self.u_nn_activated = activate_u_nn
+
     def forward(self, x_in, u_in):
-        x_rom = self.x_mor(x_in)
-        u_rom = self.u_mor(u_in)
+        if self.u_nn_activated:
+            x_rom = self.x_mor(x_in)
+            u_rom = self.u_mor(u_in)
 
-        # Predict cost to go
-        ctg_pred = self.ctg(x_rom, u_rom)
-        # Decode compressed u
-        u_decoded = self.u_decoder(u_rom)
-
-        return ctg_pred, u_decoded
+            # Predict cost to go
+            ctg_pred = self.ctg(x_rom, u_rom)
+            # Decode compressed u
+            u_decoded = self.u_decoder(u_rom)
+            return ctg_pred, u_decoded
+        else:
+            x_rom = self.x_mor(x_in)
+            # Predict cost to go
+            ctg_pred = self.ctg(x_rom, u_in)
+            return ctg_pred
 
 
 # Model Order Reducer
@@ -148,18 +157,24 @@ class MOR:
             self.x_rom = config["x_rom"]
             # Desired dimension of reduced model
             self.u_rom = config["u_rom"]
+
+            # To encode u or not (not needed if we only have a few controllers)
+            self.u_nn_activated = config["encode_u"]
             # We report loss on validation data to RayTune if we are in tuning mode
             self.is_tuning = True
 
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
-            self.num_epoch = 1000
+            self.num_epoch = 500
             self.batch_size = 5
             self.learning_rate = 0.005
             # Desired dimension of reduced model
-            self.x_rom = 14
+            self.x_rom = 100
             # Desired dimension of reduced model
-            self.u_rom = 2
+            self.u_rom = 1
+
+            self.u_nn_activated = False
+
             self.is_tuning = False
 
         # Initialise parameters
@@ -167,10 +182,10 @@ class MOR:
 
         # Input size is the same as output size
         self.x_dim = 200
-        self.u_dim = 2
+        self.u_dim = 1
 
         # Initialise neural net
-        self.model_reducer = ObjNn(self.x_dim, self.x_rom, self.u_dim, self.u_rom)
+        self.model_reducer = MorNn(self.x_dim, self.x_rom, self.u_dim, self.u_rom, self.u_nn_activated)
 
     def process_data(self, data):
         # Split x, u and cost to go columns
@@ -218,46 +233,70 @@ class MOR:
         # Specify criterion used
         criterion = nn.MSELoss()
 
-        # Train the neural network
-        for epoch in range(self.num_epoch):
+        if self.u_nn_activated:
+            # Train the neural network
+            for epoch in range(self.num_epoch):
 
-            # Full dataset gradient descent
-            # output = self.model_reducer(data)
-            # loss = criterion(output, data)
-            # loss.backward()
-            # optimizer.step()
-            # optimizer.zero_grad()
+                # Full dataset gradient descent
+                # output = self.model_reducer(data)
+                # loss = criterion(output, data)
+                # loss.backward()
+                # optimizer.step()
+                # optimizer.zero_grad()
 
-            # Minibatch gradient descent
-            # x, u and ctg are grouped in minibatches
-            for x_mb, u_mb, ctg_mb in data_loader:
-                # Model reducer takes x_in, u_in
-                ctg_pred, u_decoded = self.model_reducer(x_mb, u_mb)
+                # Minibatch gradient descent
+                # x, u and ctg are grouped in minibatches
+                for x_mb, u_mb, ctg_mb in data_loader:
+                    # Model reducer takes x_in, u_in
+                    ctg_pred, u_decoded = self.model_reducer(x_mb, u_mb)
 
-                # Loss is the loss of both ctg and decoded u
-                loss_ctg = criterion(ctg_pred, ctg_mb)
-                loss_u = criterion(u_decoded, u_mb)
-                # https://discuss.pytorch.org/t/what-does-the-backward-function-do/9944
-                loss = loss_ctg + loss_u
-                loss.backward()
+                    # Loss is the loss of both ctg and decoded u
+                    loss_ctg = criterion(ctg_pred, ctg_mb)
+                    loss_u = criterion(u_decoded, u_mb)
+                    # https://discuss.pytorch.org/t/what-does-the-backward-function-do/9944
+                    loss = loss_ctg + loss_u
+                    loss.backward()
 
-                optimizer.step()
-                optimizer.zero_grad()
+                    optimizer.step()
+                    optimizer.zero_grad()
 
-            # Test entire dataset at this epoch
-            with torch.no_grad():
-                ctg_pred, u_decoded = self.model_reducer(x, u)
-                # Loss is the loss of both ctg and decoded u
-                loss_ctg = criterion(ctg_pred, ctg)
-                loss_u = criterion(u_decoded, u)
-                loss = loss_ctg + loss_u
+                # Test entire dataset at this epoch
+                with torch.no_grad():
+                    ctg_pred, u_decoded = self.model_reducer(x, u)
+                    # Loss is the loss of both ctg and decoded u
+                    loss_ctg = criterion(ctg_pred, ctg)
+                    loss_u = criterion(u_decoded, u)
+                    loss = loss_ctg + loss_u
 
-            # Print loss
-            print('Epoch ' + str(epoch) + ': ctg- ' + str(loss_ctg.item()) + '| u- ' + str(loss_u.item()))
+                # Print loss
+                print('Epoch ' + str(epoch) + ': ctg- ' + str(loss_ctg.item()) + '| u- ' + str(loss_u.item()))
+
+        else:
+            # Train the neural network
+            for epoch in range(self.num_epoch):
+                # Minibatch gradient descent
+                # x, u and ctg are grouped in minibatches
+                for x_mb, u_mb, ctg_mb in data_loader:
+                    # Model reducer takes x_in, u_in
+                    ctg_pred = self.model_reducer(x_mb, u_mb)
+
+                    # Loss is the loss of both ctg and decoded u
+                    loss_ctg = criterion(ctg_pred, ctg_mb)
+                    loss_ctg.backward()
+
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+                # Test entire dataset at this epoch
+                with torch.no_grad():
+                    ctg_pred = self.model_reducer(x, u)
+                    # Loss is the loss of both ctg and decoded u
+                    loss_ctg = criterion(ctg_pred, ctg)
+
+                # Print loss
+                print('Epoch ' + str(epoch) + ': ctg- ' + str(loss_ctg.item()))
 
         return self
-
-    # TODO: SCALE BACK ALL THE MINMAXSCALED VARIABLES LOL - DONE
 
     def predict_ctg(self, x_rom, u_rom):
         """
@@ -271,7 +310,7 @@ class MOR:
         print("Hi imma u_rom")
         print(u_rom)
         x_rom = torch.tensor(np.array(x_rom), dtype=torch.float)
-        u_rom = torch.tensor(np.array(u_rom), dtype=torch.float)
+        u_rom = torch.tensor(np.array(u_rom).reshape(1, -1), dtype=torch.float)
         with torch.no_grad():
             ctg_pred = self.model_reducer.ctg(x_rom, u_rom)
         # Convert back to numpy array
@@ -279,6 +318,7 @@ class MOR:
         # Scale back ctg
         ctg_pred = self.ctg_scaler.inverse_transform(ctg_pred.reshape(1, -1))
         ctg_pred = ctg_pred.flatten()
+        ctg_pred = float(ctg_pred)
         return ctg_pred
 
     def decode_u(self, u_rom):
@@ -292,7 +332,7 @@ class MOR:
         print("hi imma upred")
         print(u_pred)
         # Scale back u
-        u_pred = self.u_scaler.inverse_transform(u_pred.reshape(1, 2))
+        u_pred = self.u_scaler.inverse_transform(u_pred.reshape(1, -1))
         return u_pred
 
     def encode_x(self, x_full):
@@ -306,9 +346,20 @@ class MOR:
         x_rom = x_rom.detach().numpy()
         return x_rom
 
+    def encode_u(self, u_full):
+        # Scale u
+        u_full = np.array(u_full).reshape(1, -1)
+        u_full = self.u_scaler.transform(u_full)
+        u_full = torch.tensor(u_full, dtype=torch.float)
+        with torch.no_grad():
+            u_rom = self.model_reducer.u_mor(u_full)
+        # Convert back to numpy array
+        u_rom = u_rom.detach().numpy()
+        return u_rom
+
 
 def train():
-    data = pd.read_csv(results_folder + "mpc_x_u_ctg46586.csv", sep=','
+    data = pd.read_csv(results_folder + "all.csv", sep=','
                        # , usecols=["x_0", "x_1", "x_2", "x_3"]
                        )
     print(data)

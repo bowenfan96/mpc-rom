@@ -27,18 +27,19 @@ class GdOpt:
         :param x_k: x_k_tilde parameters, fixed
         :return: optimal u_k_tilde parameters
         """
-        init_guess = np.zeros(2)  # u_tilde.size
+        init_guess = np.random.randint(low=0, high=1000, size=1)  # u_tilde.size
 
         gd_options = {}
         gd_options["maxiter"] = 1000
         gd_options["disp"] = True
+        gd_options["eps"] = 10
 
         result = scipy.optimize.minimize(
             fun=self.nn_func, x0=init_guess, args=x_k,
             options=gd_options
         )
 
-        return result
+        return result["x"]
 
     def nn_func(self, u_k, *x_k):
         """
@@ -50,6 +51,10 @@ class GdOpt:
         x_tilde = x_k[0]
         x_tilde = x_tilde.flatten()
         ctg_pred = self.mor_nn.predict_ctg(x_tilde, u_k)
+
+        print("nn_ctg_pred")
+        print(ctg_pred)
+
         return ctg_pred
 
 
@@ -132,7 +137,7 @@ class DeapOpt():
 
 
 class NnController:
-    def __init__(self, x_k_init=None, optimizer='deap'):
+    def __init__(self, x_k_init=None, optimizer='gd'):
         # Load pickle neural net
         with open('mor_nn.pickle', 'rb') as model:
             self.mor_nn = pickle.load(model)
@@ -177,9 +182,5 @@ class NnController:
 if __name__ == "__main__":
     controller = NnController()
 
-    print("test")
-    print(controller.mor_nn.decode_u([1,1]))
-    time.sleep(2)
-
     print("RESULTS")
-    print(controller.get_controls(np.zeros(200).reshape(1, 200)))
+    print(controller.get_controls(np.random.randint(low=-1000, high=1000, size=200).reshape(1, 200)))
