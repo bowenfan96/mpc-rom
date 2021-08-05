@@ -166,8 +166,8 @@ class MOR:
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
             self.num_epoch = 500
-            self.batch_size = 5
-            self.learning_rate = 0.005
+            self.batch_size = 11
+            self.learning_rate = 0.05
             # Desired dimension of reduced model
             self.x_rom = 2
             # Desired dimension of reduced model
@@ -181,7 +181,7 @@ class MOR:
         processed_data = self.process_data(data)
 
         # Input size is the same as output size
-        self.x_dim = 200
+        self.x_dim = 2
         self.u_dim = 1
 
         # Initialise neural net
@@ -357,9 +357,18 @@ class MOR:
         u_rom = u_rom.detach().numpy()
         return u_rom
 
+    def predict(self, x_full, u_full):
+        x_full = np.array(x_full).reshape(1, -1)
+        u_full = np.array(u_full).reshape(1, -1)
+        x_full = torch.tensor(x_full, dtype=torch.float)
+        u_full = torch.tensor(u_full, dtype=torch.float)
+        with torch.no_grad():
+            ctg_pred = self.model_reducer(x_full, u_full)
+        return ctg_pred
+
 
 def train():
-    data = pd.read_csv(results_folder + "all.csv", sep=','
+    data = pd.read_csv(results_folder + "all_simple.csv", sep=','
                        # , usecols=["x_0", "x_1", "x_2", "x_3"]
                        )
     print(data)
@@ -377,7 +386,7 @@ def pickle_mor_nn(mor_nn_trained):
     :param mor_nn_trained: Trained model reduction neural net
     :return: Save the pickled file
     """
-    with open('mor_nn.pickle', 'wb') as model:
+    with open('mor_nn_simple.pickle', 'wb') as model:
         pickle.dump(mor_nn_trained, model)
     print("\nSaved model to mor_nn_simple.pickle\n")
 
