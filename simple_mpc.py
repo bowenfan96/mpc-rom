@@ -338,7 +338,7 @@ class MPC:
         # Tick at every 5 integer timesteps
         plt.xticks(range(0, self.duration+1, 5))
         plt.savefig(plots_folder + "mpc_plot" + self.runtime + ".svg", format="svg")
-        plt.show()
+        # plt.show()
 
     def save_results(self, mpc_state=None, sys_state=None, mpc_action=None, ctg=None, output=None):
         df_col_names = []
@@ -371,12 +371,13 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC(xi_csv=matrices_folder + "xi.csv",
-              a_csv=matrices_folder + "A.csv",
-              b_csv=matrices_folder + "B.csv",
-              duration=10, ncp=3,
-              )
+    for i in range(50):
+        mpc = MPC(xi_csv=matrices_folder + "xi.csv",
+                  a_csv=matrices_folder + "A.csv",
+                  b_csv=matrices_folder + "B.csv",
+                  duration=5, ncp=6,
+                  )
 
-    mpc_x, mpc_u, mpc_v = mpc.solve(sim_sys=False)
-    mpc.plot(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v)
-    mpc.save_results(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v)
+        mpc_x, mpc_u, mpc_v = mpc.solve(sim_sys=False)
+        mpc.plot(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v)
+        mpc.save_results(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v)
