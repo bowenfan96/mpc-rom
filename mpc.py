@@ -13,13 +13,13 @@ import pandas as pd
 
 import datetime
 
-matrices_folder = "matrices/heateqn/"
-results_folder = "results_csv/"
-plots_folder = "results_plots/"
+matrices_folder = "matrices/random_slicot/"
+results_folder = "results_csv/random_slicot/"
+plots_folder = "results_plots/random_slicot/"
 
 
 class MPC:
-    def __init__(self, xi_csv, a_csv, b_csv, duration, ncp, gen_data=True):
+    def __init__(self, xi_csv, a_csv, b_csv, duration, ncp, gen_data=True, c_csv=None, d_csv=None):
         """
         x_dot = Ax + Bu
         :param xi_csv: Initial system state
@@ -28,23 +28,53 @@ class MPC:
         :param duration: Number of time steps
         """
 
+        # Don't think these self._csv are ever used, can probably delete
         self.xi_csv = xi_csv
         self.a_csv = a_csv
         self.b_csv = b_csv
+        self.c_csv = c_csv if c_csv is not None else None
+        self.d_csv = d_csv if d_csv is not None else None
+
         self.duration = duration
         self.ncp = ncp
 
         self.A = np.genfromtxt(a_csv, delimiter=',')
         self.B = np.genfromtxt(b_csv, delimiter=',')
+        self.C = np.genfromtxt(c_csv, delimiter=',') if c_csv is not None else None
+        self.D = np.genfromtxt(d_csv, delimiter=',') if d_csv is not None else None
+
+        # ----- SOME CHECKS TO ENSURE THE INPUT MATRICES ARE FORMATTED CORRECTLY ----- #
         # A should be a square matrix
         assert self.A.ndim == 2 and self.A.shape[0] == self.A.shape[1]
         # A and B should have same number of rows
         assert self.B.shape[0] == self.A.shape[0]
 
+        if self.C is not None:
+            # Same number of outputs as the number of rows of C
+            # assert self.C.ndim == 2 and self.x.shape[0] == self.C.shape[1]
+            self.y = np.zeros(self.C.shape[0])
+
+        if self.D is not None:
+            # assert self.D.ndim == 2 and self.x.shape[0] == self.D.shape[0]
+            assert self.B.shape[1] == self.D.shape[1]
+
+        # Get number of state variables - dimensionality of x_full - number of rows = columns of A
+        self.num_states = self.A.shape[0]
+        # Get number of controllers - dimensionality of u_full - number of columns of B
+        if self.B.ndim == 1:
+            self.num_controllers = 1
+        else:
+            self.num_controllers = self.B.shape[1]
+        # Get number of outputs - dimensionality of y - number of rows of C
+        if self.C.ndim == 1:
+            self.num_output = 1
+        else:
+            self.num_output = self.C.shape[0]
+
         # If we are generating data to train the model reduction neural net,
         # then initial x_i is randomly generated
         if gen_data:
-            self.x = np.random.randint(low=0, high=100, size=self.A.shape[0])
+            self.x = np.random.randint(low=-1000, high=1000, size=self.A.shape[0])
         else:
             self.x = np.genfromtxt(xi_csv, delimiter=',')
         assert self.x.ndim == 1
@@ -55,7 +85,7 @@ class MPC:
         self.runtime = str(now.day) + str(now.hour) + str(now.minute) + str(now.second)
 
         # E MATRIX FOR CHAHLAOUI MODELS INCLUDING HEAT EQUATION
-        self.E = np.genfromtxt(matrices_folder + "E.csv", delimiter=',')
+        # self.E = np.genfromtxt(matrices_folder + "E.csv", delimiter=',')
 
         # ----- BEGIN PYOMO CODE ----- #
         # Initialize pyomo model
@@ -69,57 +99,90 @@ class MPC:
         # Pyomo RangeSet includes both first and last
         # Pyomo defaults sets to 1-indexing so we force 0-indexing
         self.model.I = RangeSet(0, self.A.shape[1]-1)
-
-        # J is turned off if only 1 controller
-        self.model.J = RangeSet(0, self.B.shape[1]-1)
-
-        self.model.x = Var(self.model.I, self.model.time, domain=NonNegativeReals)
+        self.model.x = Var(self.model.I, self.model.time)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time, initialize=0)
 
-        # More than 1 controller
-        self.model.u = Var(self.model.J, self.model.time, initialize=0, domain=NonNegativeReals)
-        # 1 controller
-        # self.model.u = Var(self.model.time, initialize=0)
+        # J is turned off if only 1 controller
+        assert self.num_controllers >= 1
+        if self.num_controllers > 1:
+            self.model.J = RangeSet(0, self.B.shape[1]-1)
+            self.model.u = Var(self.model.J, self.model.time, initialize=0)
+        else:
+            self.model.u = Var(self.model.time, initialize=0)
+
+        # FOR Y = CX
+        # K is turned off if only 1 output
+        assert self.num_output >= 1
+        if self.num_output > 1:
+            self.model.K = RangeSet(0, self.C.shape[0]-1)
+            self.model.y = Var(self.model.K, self.model.time)
+        else:
+            self.model.y = Var(self.model.time)
 
         # Edit finite element step size here
         self.discretizer = TransformationFactory('dae.collocation')
         self.discretizer.apply_to(self.model, wrt=self.model.time, nfe=self.duration,
                                   scheme='LAGRANGE-RADAU', ncp=self.ncp)
+        # Force u to be piecewise linear
+        self.discretizer.reduce_collocation_points(self.model, var=self.model.u, ncp=1, contset=self.model.time)
 
         # Define derivative variables
         def ode_Ax(m, i, t):
             return sum((m.x[j, t] * self.A[i][j]) for j in range(self.A.shape[1]))
 
         # WHEN WE HAVE MORE THAN 1 CONTROLLER
-        def ode_Bu(m, i, t):
-            return sum((m.u[j, t] * self.B[i][j]) for j in range(self.B.shape[1]))
+        if self.num_controllers > 1:
+            def ode_Bu(m, i, t):
+                return sum((m.u[j, t] * self.B[i][j]) for j in range(self.B.shape[1]))
+        else:
+            # WHEN WE HAVE 1 CONTROLLER ONLY
+            def ode_Bu(m, i, t):
+                return m.u[t] * self.B[i]
 
-        # WHEN WE HAVE 1 CONTROLLER ONLY
-        # def ode_Bu(m, i, t):
-        #     return m.u[t] * self.B[i]
+        # FOR Y = CX
+        if self.num_output > 1:
+            def ode_Cx(m, k, t):
+                return sum((m.x[j, t] * self.C[k][j]) for j in range(self.C.shape[1]))
+        else:
+            def ode_Cx(m, t):
+                return sum((m.x[j, t] * self.C[j]) for j in range(self.C.size))
 
         self.model.ode = ConstraintList()
+        self.model.ycx = ConstraintList()
 
         # FOR GENERAL X_DOT = AX + BU
-        # for time in self.model.time:
-        #     for i in range(self.A.shape[0]):
-        #         self.model.ode.add(
-        #             self.model.x_dot[i, time] == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
-        #         )
-        #         # Fix variables based on initial values
-        #         self.model.x[i, 0].fix(self.x[i])
-
-        # FOR HEAT EQUATION EX_DOT = AX + BU
-        def ode_Exdot(m, i, t):
-            return sum((m.x_dot[j, t] * self.E[i][j]) for j in range(self.A.shape[1]))
-
         for time in self.model.time:
-            for i in range(self.A.shape[0]):
+            for i in range(self.num_states):
                 self.model.ode.add(
-                    ode_Exdot(self.model, i, time) == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
+                    self.model.x_dot[i, time] == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
                 )
                 # Fix variables based on initial values
                 self.model.x[i, 0].fix(self.x[i])
+
+        # FOR Y = CX + DU, IF Y IS THE OBJECTIVE TO BE CONTROLLED
+        if self.num_output > 1:
+            for time in self.model.time:
+                for k in range(self.num_output):
+                    self.model.ycx.add(
+                        self.model.y[k, time] == ode_Cx(self.model, k, time)
+                    )
+        else:
+            for time in self.model.time:
+                self.model.ycx.add(
+                    self.model.y[time] == ode_Cx(self.model, time)
+            )
+
+        # FOR HEAT EQUATION EX_DOT = AX + BU
+        # def ode_Exdot(m, i, t):
+        #     return sum((m.x_dot[j, t] * self.E[i][j]) for j in range(self.A.shape[1]))
+        #
+        # for time in self.model.time:
+        #     for i in range(self.A.shape[0]):
+        #         self.model.ode.add(
+        #             ode_Exdot(self.model, i, time) == ode_Ax(self.model, i, time) + ode_Bu(self.model, i, time)
+        #         )
+        #         # Fix variables based on initial values
+        #         self.model.x[i, 0].fix(self.x[i])
 
         # (OLD) Objective: Bring the entire system to zero AND minimize controller cost
         # def obj_rule(m):
@@ -136,48 +199,28 @@ class MPC:
         # self.model.setpoint = Constraint(rule=setpoint)
 
         def obj_rule(m):
-            setpoint_cost = sum((50 - m.x[133, t])**2 for t in m.time)
-            # controller_cost = sum((m.u[j])**2 for j in m.J * m.time)
+            # setpoint_cost = sum((self.model.x[i] - 500)**2 for i in m.I * m.time)
+
+            # Make y follow an arbitrary trajectory
+            # y = 1000t^2
+            if self.num_output > 1:
+                setpoint_cost = sum((self.model.y[k] - 1000*k**2) ** 2 for k in m.K * m.time)
+            else:
+                setpoint_cost = sum((self.model.y[t] - 1000*t**2) ** 2 for t in m.time)
+
+            # controller_cost = sum(sum((m.u[j, t+1] - m.u[j, t])**2
+            #                           for t in range(duration-1))
+            #                           for j in m.J)
+            controller_cost = sum((self.model.u[t]) ** 2 for t in m.time)
             # Edit weights for setpoint and controller costs
-            # weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
-            # return weighted_cost
-            return setpoint_cost
+            weighted_cost = 0.8*setpoint_cost + 0.2*controller_cost
+            return weighted_cost
+            # return setpoint_cost
 
         self.model.obj = Objective(
             rule=obj_rule,
             sense=minimize
         )
-
-    def calc_ctg(self, x, u):
-        """
-        Calculate the cost to go given system and controller states
-        :param x: System (x) states given as an array
-        :param u: Controller (u) states given as an array
-        :return: Append cost to go to system and controller states and return x_u_ctg
-        """
-        # ----- EDIT COST FUNCTION BELOW ----- #
-        def cost(x_row, u_row):
-            setpoint_cost = sum((50 - xi)**2 for xi in x_row)
-            # controller_cost = sum(ui**2 for ui in u_row)
-            # controller_cost = u_row ** 2
-            # weighted_cost = 0.95*setpoint_cost + 0.05*controller_cost
-            # return weighted_cost
-            return setpoint_cost
-        # ----- EDIT COST FUNCTION ABOVE ----- #
-
-        # If duration is 100, there should be 101 entries as initial x0 and u0 are included
-        # TURN OFF TO RECORD COLLOCATION POINTS AS DATA
-        # assert x.shape[0] == self.duration + 1
-        # assert u.shape[0] == self.duration + 1
-
-        cost_to_go = []
-        for t in range(x.shape[0]):
-            cost_to_go.append(cost(x[t], u[t]))
-        for t in reversed(range(x.shape[0] - 1)):
-            cost_to_go[t] += cost_to_go[t+1]
-
-        cost_to_go = np.array(cost_to_go).reshape(-1, 1)
-        return cost_to_go
 
     def solve(self, sim_sys=True):
         """
@@ -200,6 +243,7 @@ class MPC:
         mpc_state = []
         sys_state = []
         mpc_action = []
+        output = []
 
         if sim_sys:
             # Create a system object to simulate taking readings from an actual system
@@ -235,12 +279,16 @@ class MPC:
             # Record values at intervals of 1 timestep
             # Necessary as discretizer is more granular than our step size
             for time in self.model.time:
-                # if float(time).is_integer():
+                if float(time).is_integer():
                     mpc_state.append(list(value(self.model.x[:, time])))
-                    # FOR 1 CONTROLLER ONLY
-                    # mpc_action.append(value(self.model.u[time]))
-                    # FOR MORE THAN 1 CONTROLLER
-                    mpc_action.append(list(value(self.model.u[:, time])))
+                    if self.num_controllers > 1:
+                        mpc_action.append(list(value(self.model.u[:, time])))
+                    else:
+                        mpc_action.append(value(self.model.u[time]))
+                    if self.num_output > 1:
+                        output.append(list(value(self.model.y[:, time])))
+                    else:
+                        output.append(value(self.model.y[time]))
 
         # Output error if solution cannot be found, otherwise solver should print "ok"
         print(results.solver.status)
@@ -249,17 +297,54 @@ class MPC:
         mpc_state = np.array(mpc_state)
         mpc_action = np.array(mpc_action)
         sys_state = np.array(sys_state)
+        output = np.array(output)
 
-        cost_to_go = self.calc_ctg(mpc_state, mpc_action)
+        cost_to_go = self.calc_ctg(mpc_state, mpc_action, output)
 
         if sim_sys:
-            return mpc_state, sys_state, mpc_action, cost_to_go
+            return mpc_state, sys_state, mpc_action, cost_to_go, output
         else:
-            return mpc_state, mpc_action, cost_to_go
+            return mpc_state, mpc_action, cost_to_go, output
 
-    def plot(self, mpc_state=None, sys_state=None, mpc_action=None, ctg=None):
+    def calc_ctg(self, x, u, y=None):
+        """
+        Calculate the cost to go given system and controller states
+        :param y: Output (y) if cost depends on y
+        :param x: System (x) states given as an array
+        :param u: Controller (u) states given as an array
+        :return: Append cost to go to system and controller states and return x_u_ctg
+        """
+        # ----- EDIT COST FUNCTION BELOW ----- #
+        def cost(x_row, u_row, y_row, time):
+            setpoint_cost = (y_row - 1000*t**2)**2
+            # setpoint_cost = sum((50 - xi)**2 for xi in x_row)
+            # controller_cost = sum(ui**2 for ui in u_row)
+            controller_cost = u_row ** 2
+            weighted_cost = 0.8*setpoint_cost + 0.2*controller_cost
+            return weighted_cost
+            # return setpoint_cost
+        # ----- EDIT COST FUNCTION ABOVE ----- #
+
+        # If duration is 100, there should be 101 entries as initial x0 and u0 are included
+        # TURN OFF TO RECORD COLLOCATION POINTS AS DATA
+        assert x.shape[0] == self.duration + 1
+        assert u.shape[0] == self.duration + 1
+        if y is not None:
+            assert y.shape[0] == self.duration + 1
+
+        cost_to_go = []
+        for t in range(self.duration + 1):
+            cost_to_go.append(cost(x[t], u[t], y[t], t))
+        for t in reversed(range(self.duration)):
+            cost_to_go[t] += cost_to_go[t+1]
+
+        cost_to_go = np.array(cost_to_go).reshape(-1, 1)
+        return cost_to_go
+
+    def plot(self, mpc_state=None, sys_state=None, mpc_action=None, ctg=None, output=None):
         """
         Plot a nice graph
+        :param output: y
         :param mpc_state: mpc_x
         :param sys_state: sys_x
         :param mpc_action: u
@@ -267,8 +352,9 @@ class MPC:
         :return: Save a nice graph
         """
         print("PLOTTER CALLED")
-        # To fix empty subplot blank space problem
         if sys_state is not None:
+            fig, axs = plt.subplots(5)
+        elif output is not None:
             fig, axs = plt.subplots(4)
         else:
             fig, axs = plt.subplots(3)
@@ -276,29 +362,43 @@ class MPC:
         # Make figure the size of an A4 page
         fig.set_size_inches(8.3, 11.7)
 
-        # Note the order of the plots, to avoid the blank sys plot
+        # Reshape controller and output into 2d column vector
+        if self.num_controllers == 1:
+            mpc_action = mpc_action.reshape(-1, 1)
+        if self.num_output == 1:
+            output = output.reshape(-1, 1)
+
         if mpc_state is not None:
-            for i in range(len(mpc_state[0])):
-                axs[0].plot(mpc_state[:, i], label='mpc_x_{}'.format(i))
-            axs[0].legend(loc='upper right', fontsize='small')
+            for i in range(self.num_states):
+                # Turn on labelling
+                # axs[0].plot(mpc_state[:, i], label='mpc_x_{}'.format(i))
+                # axs[0].legend(loc='upper right', fontsize='small')
+                # Turn off labelling
+                axs[0].plot(mpc_state[:, i])
             axs[0].set_title("MPC state variables (x) against time", fontsize='medium')
 
         if sys_state is not None:
-            for i in range(len(sys_state[0])):
-                axs[3].plot(sys_state[:, i], label='sys_x_{}'.format(i))
-            axs[3].legend(loc='upper right', fontsize='small')
-            axs[0].set_title("System state variables (x) against time", fontsize='medium')
+            for i in range(self.num_states):
+                axs[4].plot(sys_state[:, i], label='sys_x_{}'.format(i))
+            axs[4].legend(loc='upper right', fontsize='small')
+            axs[4].set_title("System state variables (x) against time", fontsize='medium')
 
         if mpc_action is not None:
-            for j in range(len(mpc_action[0])):
+            for j in range(self.num_controllers):
                 axs[1].plot(mpc_action[:, j], label='u_{}'.format(j))
             axs[1].legend(loc='upper right', fontsize='small')
             axs[1].set_title("MPC control action (u) against time", fontsize='medium')
 
         if ctg is not None:
-            axs[2].plot(ctg, label='ctg')
+            axs[3].plot(ctg, label='ctg')
+            axs[3].legend(loc='upper right', fontsize='small')
+            axs[3].set_title("Cost to go against time", fontsize='medium')
+
+        if output is not None:
+            for k in range(self.num_output):
+                axs[2].plot(output[:, k], label='y_{}'.format(k))
             axs[2].legend(loc='upper right', fontsize='small')
-            axs[2].set_title("Cost to go against time", fontsize='medium')
+            axs[2].set_title("Output (y) against time", fontsize='medium')
 
         plt.xlabel("Time")
         # Tick at every 5 integer timesteps
@@ -306,19 +406,28 @@ class MPC:
         plt.savefig(plots_folder + "mpc_plot" + self.runtime + ".svg", format="svg")
         plt.show()
 
-    def save_results(self, mpc_state=None, sys_state=None, mpc_action=None, ctg=None):
+    def save_results(self, mpc_state=None, sys_state=None, mpc_action=None, ctg=None, output=None):
         df_col_names = []
         data_export = None
 
         if mpc_state is not None:
-            df_col_names.extend("mpc_x_{}".format(i) for i in range(self.A.shape[1]))
+            # Reshape controller and output into 2d column vector
+            if self.num_controllers == 1:
+                mpc_action = mpc_action.reshape(-1, 1)
+            df_col_names.extend("mpc_x_{}".format(i) for i in range(self.num_states))
             data_export = mpc_state
         if sys_state is not None:
-            df_col_names.extend("sys_x_{}".format(i) for i in range(self.A.shape[1]))
+            df_col_names.extend("sys_x_{}".format(i) for i in range(self.num_states))
             data_export = np.hstack((data_export, sys_state))
         if mpc_action is not None:
-            df_col_names.extend("u_{}".format(i) for i in range(self.B.shape[1]))
+            df_col_names.extend("u_{}".format(i) for i in range(self.num_controllers))
             data_export = np.hstack((data_export, mpc_action))
+        if output is not None:
+            # Reshape controller and output into 2d column vector
+            if self.num_output == 1:
+                output = output.reshape(-1, 1)
+            df_col_names.extend("y_{}".format(i) for i in range(self.num_output))
+            data_export = np.hstack((data_export, output))
         if ctg is not None:
             df_col_names.extend(["ctg"])
             data_export = np.hstack((data_export, ctg))
@@ -328,11 +437,13 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC(matrices_folder + "xi.csv",
-              matrices_folder + "A.csv",
-              matrices_folder + "B.csv",
-              duration=10, ncp=3)
+    mpc = MPC(xi_csv=matrices_folder + "xi.csv",
+              a_csv=matrices_folder + "A.csv",
+              b_csv=matrices_folder + "B.csv",
+              duration=20, ncp=3,
+              c_csv=matrices_folder + "C.csv"
+              )
 
-    mpc_x, u, v = mpc.solve(sim_sys=False)
-    mpc.plot(mpc_state=mpc_x, mpc_action=u, ctg=v)
-    mpc.save_results(mpc_state=mpc_x, mpc_action=u, ctg=v)
+    mpc_x, mpc_u, mpc_v, mpc_y = mpc.solve(sim_sys=False)
+    mpc.plot(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v, output=mpc_y)
+    mpc.save_results(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v, output=mpc_y)
