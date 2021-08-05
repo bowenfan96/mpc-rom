@@ -165,8 +165,8 @@ class MOR:
 
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
-            self.num_epoch = 500
-            self.batch_size = 11
+            self.num_epoch = 1000
+            self.batch_size = 6
             self.learning_rate = 0.05
             # Desired dimension of reduced model
             self.x_rom = 2
