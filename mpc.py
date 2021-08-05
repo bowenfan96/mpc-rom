@@ -404,7 +404,7 @@ class MPC:
         # Tick at every 5 integer timesteps
         plt.xticks(range(0, self.duration+1, 5))
         plt.savefig(plots_folder + "mpc_plot" + self.runtime + ".svg", format="svg")
-        plt.show()
+        # plt.show()
 
     def save_results(self, mpc_state=None, sys_state=None, mpc_action=None, ctg=None, output=None):
         df_col_names = []
