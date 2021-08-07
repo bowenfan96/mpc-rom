@@ -371,7 +371,7 @@ class MPC:
 
 
 if __name__ == "__main__":
-    for i in range(100):
+    for i in range(50):
         mpc = MPC(xi_csv=matrices_folder + "xi.csv",
                   a_csv=matrices_folder + "A.csv",
                   b_csv=matrices_folder + "B.csv",

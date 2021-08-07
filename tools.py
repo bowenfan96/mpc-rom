@@ -112,9 +112,9 @@ def predict_state_and_controls():
     with open('deep_nn_simple.pickle', 'rb') as model:
         deep_nn_ = pickle.load(model)
 
-    x_full = [11, 19]
+    x_full = [4, 1]
     # x_full = np.array(x_full).reshape(1, -1)
-    u = [5.441928]
+    u = [2]
 
     x_full = torch.FloatTensor(x_full)
     u = torch.FloatTensor(u)
@@ -129,3 +129,5 @@ def predict_state_and_controls():
 
 if __name__ == "__main__":
     predict_state_and_controls()
+    # concat_csv()
+    # reshape_csv()
