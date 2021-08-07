@@ -5,7 +5,10 @@ import pandas as pd
 import glob
 
 # from mor_nn import *
-from mor_nn_simple import *
+# from mor_nn_simple import *
+import torch.utils.data
+
+from deep_nn import *
 import pickle
 import matplotlib.pyplot as plt
 
@@ -63,7 +66,7 @@ def concat_csv():
 def reshape_csv():
     file = results_folder + "all_simple.csv"
     df = pd.read_csv(file, index_col=None, header=0)
-    df.drop(index=df.iloc[::6, :].index.tolist(), inplace=True)
+    df.drop(index=df.iloc[5::6, :].index.tolist(), inplace=True)
     df.to_csv(results_folder + "all_simple_reshaped.csv")
 
 
@@ -105,5 +108,24 @@ def check_ctg():
     print(mor_nn.predict(x_full, u))
 
 
+def predict_state_and_controls():
+    with open('deep_nn_simple.pickle', 'rb') as model:
+        deep_nn_ = pickle.load(model)
+
+    x_full = [11, 19]
+    # x_full = np.array(x_full).reshape(1, -1)
+    u = [5.441928]
+
+    x_full = torch.FloatTensor(x_full)
+    u = torch.FloatTensor(u)
+
+    xu_i = torch.hstack((x_full, u))
+
+    xu_f_pred = deep_nn_.predict(xu_i)
+
+    print("Predicted")
+    print(xu_f_pred)
+
+
 if __name__ == "__main__":
-    plot_u_vs_ctg()
+    predict_state_and_controls()

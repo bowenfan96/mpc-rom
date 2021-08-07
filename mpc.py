@@ -199,7 +199,7 @@ class MPC:
         # self.model.setpoint = Constraint(rule=setpoint)
 
         def obj_rule(m):
-            setpoint_cost = sum((self.model.x[1, t] - 500)**2 for t in m.time)
+            setpoint_cost = sum((self.model.y[t] - 1000)**2 for t in m.time)
 
             # Make y follow an arbitrary trajectory
             # y = 1000t^2
@@ -440,7 +440,7 @@ if __name__ == "__main__":
     mpc = MPC(xi_csv=matrices_folder + "xi.csv",
               a_csv=matrices_folder + "A.csv",
               b_csv=matrices_folder + "B.csv",
-              duration=20, ncp=3,
+              duration=5, ncp=3,
               c_csv=matrices_folder + "C.csv"
               )
 
