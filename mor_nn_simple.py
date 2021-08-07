@@ -356,11 +356,14 @@ class MOR:
     def predict(self, x_full, u_full):
         x_full = np.array(x_full).reshape(1, -1)
         u_full = np.array(u_full).reshape(1, -1)
+        x_full = self.x_scaler.transform(x_full)
+        u_full = self.u_scaler.transform(u_full)
         x_full = torch.tensor(x_full, dtype=torch.float)
         u_full = torch.tensor(u_full, dtype=torch.float)
         with torch.no_grad():
             ctg_pred = self.model_reducer(x_full, u_full)
-        return ctg_pred
+        ctg_pred = self.ctg_scaler.inverse_transform(ctg_pred)
+        return ctg_pred.flatten()
 
 
 def train():
