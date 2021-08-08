@@ -74,7 +74,7 @@ class MPC:
         # If we are generating data to train the model reduction neural net,
         # then initial x_i is randomly generated
         if gen_data:
-            self.x = np.random.randint(low=-1000, high=1000, size=self.A.shape[0])
+            self.x = np.random.randint(low=-10, high=10, size=self.A.shape[0])
         else:
             self.x = np.genfromtxt(xi_csv, delimiter=',')
         assert self.x.ndim == 1
@@ -199,7 +199,7 @@ class MPC:
         # self.model.setpoint = Constraint(rule=setpoint)
 
         def obj_rule(m):
-            setpoint_cost = sum((self.model.y[t] - 1000)**2 for t in m.time)
+            setpoint_cost = sum((self.model.y[t] - 100*t**2)**2 for t in m.time)
 
             # Make y follow an arbitrary trajectory
             # y = 1000t^2
@@ -211,11 +211,11 @@ class MPC:
             # controller_cost = sum(sum((m.u[j, t+1] - m.u[j, t])**2
             #                           for t in range(duration-1))
             #                           for j in m.J)
-            controller_cost = sum((self.model.u[t]) ** 2 for t in m.time)
+            # controller_cost = sum((self.model.u[t]) ** 2 for t in m.time)
             # Edit weights for setpoint and controller costs
-            weighted_cost = 1*setpoint_cost + 0*controller_cost
-            return weighted_cost
-            # return setpoint_cost
+            # weighted_cost = 1*setpoint_cost + 0*controller_cost
+            # return weighted_cost
+            return setpoint_cost
 
         self.model.obj = Objective(
             rule=obj_rule,
@@ -316,7 +316,7 @@ class MPC:
         """
         # ----- EDIT COST FUNCTION BELOW ----- #
         def cost(x_row, u_row, y_row, time):
-            setpoint_cost = (y_row - 1000)**2
+            setpoint_cost = (y_row - 100)**2
             # setpoint_cost = sum((50 - xi)**2 for xi in x_row)
             # controller_cost = sum(ui**2 for ui in u_row)
             controller_cost = u_row ** 2
@@ -437,13 +437,14 @@ class MPC:
 
 
 if __name__ == "__main__":
-    mpc = MPC(xi_csv=matrices_folder + "xi.csv",
-              a_csv=matrices_folder + "A.csv",
-              b_csv=matrices_folder + "B.csv",
-              duration=5, ncp=3,
-              c_csv=matrices_folder + "C.csv"
-              )
+    for i in range(100):
+        mpc = MPC(xi_csv=matrices_folder + "xi.csv",
+                  a_csv=matrices_folder + "A.csv",
+                  b_csv=matrices_folder + "B.csv",
+                  duration=5, ncp=3,
+                  c_csv=matrices_folder + "C.csv"
+                  )
 
-    mpc_x, mpc_u, mpc_v, mpc_y = mpc.solve(sim_sys=False)
-    mpc.plot(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v, output=mpc_y)
-    mpc.save_results(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v, output=mpc_y)
+        mpc_x, mpc_u, mpc_v, mpc_y = mpc.solve(sim_sys=False)
+        mpc.plot(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v, output=mpc_y)
+        mpc.save_results(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v, output=mpc_y)

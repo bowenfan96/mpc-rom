@@ -97,10 +97,10 @@ class CtgNn(nn.Module):
     def __init__(self, x_rom, u_rom):
         super(CtgNn, self).__init__()
         self.ctg1 = nn.Linear((x_rom + u_rom), ((x_rom + u_rom + 1) * 2))
-        self.ctg2 = nn.Linear((x_rom + u_rom + 1) * 2, (x_rom + u_rom + 1) * 4)
+        self.ctg2 = nn.Linear((x_rom + u_rom + 1) * 2, (x_rom + u_rom + 1) * 2)
         # Output is just 1 column - the cost to go value
-        self.ctg3 = nn.Linear((x_rom + u_rom + 1) * 4, (x_rom + u_rom + 1) * 4)
-        self.ctg4 = nn.Linear((x_rom + u_rom + 1) * 4, (x_rom + u_rom + 1) * 2)
+        self.ctg3 = nn.Linear((x_rom + u_rom + 1) * 2, (x_rom + u_rom + 1) * 2)
+        self.ctg4 = nn.Linear((x_rom + u_rom + 1) * 2, (x_rom + u_rom + 1) * 2)
         self.ctg5 = nn.Linear((x_rom + u_rom + 1) * 2, 1)
 
         nn.init.kaiming_uniform_(self.ctg1.weight)
@@ -169,8 +169,8 @@ class MOR:
         # If we are not tuning, then set the hyperparameters to the optimal ones we already found
         else:
             self.num_epoch = 500
-            self.batch_size = 11
-            self.learning_rate = 0.05
+            self.batch_size = 6
+            self.learning_rate = 0.005
             # Desired dimension of reduced model
             self.x_rom = 2
             # Desired dimension of reduced model
@@ -362,12 +362,14 @@ class MOR:
         u_full = torch.tensor(u_full, dtype=torch.float)
         with torch.no_grad():
             ctg_pred = self.model_reducer(x_full, u_full)
+        print(ctg_pred)
         ctg_pred = self.ctg_scaler.inverse_transform(ctg_pred)
+        print(ctg_pred)
         return ctg_pred.flatten()
 
 
 def train():
-    data = pd.read_csv(results_folder + "all_simple (1).csv", sep=','
+    data = pd.read_csv(results_folder + "all_simple.csv", sep=','
                        # , usecols=["x_0", "x_1", "x_2", "x_3"]
                        )
     print(data)

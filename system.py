@@ -5,9 +5,9 @@ import scipy.integrate
 import matplotlib.pyplot as plt
 import casadi
 
-matrices_folder = "matrices/heateqn"
-results_folder = "results_csv/"
-plots_folder = "results_plots/"
+matrices_folder = "matrices/simple/"
+results_folder = "results_csv/simple/"
+plots_folder = "results_plots/simple/"
 
 
 class System:
@@ -275,7 +275,7 @@ class System:
 
 
 if __name__ == "__main__":
-    system = System("matrices/xi.csv", "matrices/A.csv", "matrices/B.csv", "matrices/C.csv")
+    system = System(matrices_folder + "xi.csv", matrices_folder + "A.csv", matrices_folder + "B.csv")
     res_x_u = system.simulate(10)
     res_x_u_ctg = system.calc_ctg(res_x_u)
     system.save_results(res_x_u_ctg)
