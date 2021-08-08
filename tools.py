@@ -71,7 +71,7 @@ def reshape_csv():
 
 
 def plot_u_vs_ctg():
-    # Load pickle neural net
+    # Load pickle neural unet
     with open('mor_nn_simple.pickle', 'rb') as model:
         mor_nn = pickle.load(model)
     u_full = np.linspace(start=-20, stop=20, num=41)
@@ -96,7 +96,7 @@ def plot_u_vs_ctg():
 
 
 def check_ctg():
-    # Load pickle neural net
+    # Load pickle neural unet
     with open('mor_nn_simple.pickle', 'rb') as model:
         mor_nn = pickle.load(model)
 

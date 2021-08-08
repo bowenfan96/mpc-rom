@@ -20,7 +20,7 @@ matrices_folder = "matrices/simple/"
 results_folder = "results_csv/simple/"
 plots_folder = "results_plots/simple/"
 
-# Neural net structure:
+# Neural unet structure:
 # x1, x2, x3, etc > i1, i2, etc
 # u1, u2, u3, etc > j1, j2, etc
 # i1, i2, etc > x_tilde1, x_tilde2, etc
@@ -33,7 +33,7 @@ plots_folder = "results_plots/simple/"
 class Xnn(nn.Module):
     def __init__(self, x_dim, x_rom):
         super(Xnn, self).__init__()
-        # Neural net structure: xi > ki > zi
+        # Neural unet structure: xi > ki > zi
         self.x_input_layer = nn.Linear(x_dim, (x_dim + x_rom) // 2)
         self.x_hidden_layer = nn.Linear((x_dim + x_rom) // 2, (x_dim + x_rom) // 2)
         self.x_rom_layer = nn.Linear((x_dim + x_rom) // 2, x_rom)
@@ -185,7 +185,7 @@ class MOR:
         self.x_dim = 2
         self.u_dim = 1
 
-        # Initialise neural net
+        # Initialise neural unet
         self.model_reducer = CtgNn(2, 1)
 
     def process_data(self, data):
@@ -383,8 +383,8 @@ def train():
 
 def pickle_mor_nn(mor_nn_trained):
     """
-    Pickle the trained neural net
-    :param mor_nn_trained: Trained model reduction neural net
+    Pickle the trained neural unet
+    :param mor_nn_trained: Trained model reduction neural unet
     :return: Save the pickled file
     """
     with open('mor_nn_simple.pickle', 'wb') as model:

@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn import preprocessing
 
-# Neural net structure:
+# Neural unet structure:
 # Xnn: Full model - Intermediate - Reduced
 # Unn: Reduced - Intermediate - Full
 
@@ -108,7 +108,7 @@ class Autoencoder():
         print(self.model_dim)
         print(self.reduced_dim_size)
 
-        # Initialise autoencoder neural net
+        # Initialise autoencoder neural unet
         self.autoencoder = Wrapper(self.model_dim, self.reduced_dim_size)
 
         return

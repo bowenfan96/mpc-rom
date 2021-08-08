@@ -18,7 +18,7 @@ from deap import base, creator, tools
 class GdOpt:
     def __init__(self, mor_nn):
         print("Gradient descent optimizer")
-        # Pass neural net for evaluation to the optimizer
+        # Pass neural unet for evaluation to the optimizer
         self.mor_nn = mor_nn
 
     def scipy_opt(self, x_k):
@@ -43,10 +43,10 @@ class GdOpt:
 
     def nn_func(self, u_k, *x_k):
         """
-        Predict cost to go using neural net
+        Predict cost to go using neural unet
         :param u_k: u_k_tilde, the reduced control variables (to be found)
         :param x_k: x_k_tilde, the reduced state variables
-        :return: Cost to go, predicted using the neural net
+        :return: Cost to go, predicted using the neural unet
         """
         x_tilde = x_k[0]
         x_tilde = x_tilde.flatten()
@@ -74,7 +74,7 @@ class DeapOpt():
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
 
         print("Evolutionary algorithm optimizer")
-        # Pass neural net for evaluation to the optimizer
+        # Pass neural unet for evaluation to the optimizer
         self.mor_nn = mor_nn
 
         self.toolbox.register("mate", tools.cxTwoPoint)
@@ -84,7 +84,7 @@ class DeapOpt():
 
     def evaluate(self, individual, x_k):
         """
-        Predict cost to go using neural net
+        Predict cost to go using neural unet
         :param individual: u_k_tilde, the reduced control variables (to be found)
         :param x_k: x_k_tilde, the reduced state variables
         :return:
@@ -138,7 +138,7 @@ class DeapOpt():
 
 class NnController:
     def __init__(self, x_k_init=None, optimizer='gd'):
-        # Load pickle neural net
+        # Load pickle neural unet
         with open('mor_nn.pickle', 'rb') as model:
             self.mor_nn = pickle.load(model)
 
@@ -158,7 +158,7 @@ class NnController:
         :param x_full: Full set of state variables
         :return: Optimal control actions in full controller variables
         """
-        # 1. Get x_tilde from x_full by passing through the neural net
+        # 1. Get x_tilde from x_full by passing through the neural unet
         x_tilde = self.mor_nn.encode_x(x_full)
         x_tilde = x_tilde.flatten()
         print(x_tilde)

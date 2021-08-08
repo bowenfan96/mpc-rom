@@ -16,9 +16,9 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn import preprocessing
 
-matrices_folder = "matrices/simple/"
-results_folder = "results_csv/simple/"
-plots_folder = "results_plots/simple/"
+matrices_folder = "matrices/"
+results_folder = "results_csv/"
+plots_folder = "results_plots/"
 
 
 # One subnet with 2 hidden layers for each time step
@@ -129,7 +129,7 @@ class NnCtrlSim:
         for epoch in range(1000):
             # optimizer.zero_grad()
             #
-            # xu_out = self.net(xi, ui)
+            # xu_out = self.unet(xi, ui)
             #
             # x1_pred = xu_out[:, 0]
             # x2_pred = xu_out[:, 1]
@@ -263,8 +263,8 @@ class NnCtrlSim:
 
 def pickle_mor_nn(mor_nn_trained):
     """
-    Pickle the trained neural net
-    :param mor_nn_trained: Trained model reduction neural net
+    Pickle the trained neural unet
+    :param mor_nn_trained: Trained model reduction neural unet
     :return: Save the pickled file
     """
     with open('deep_nn_simple.pickle', 'wb') as model:

@@ -69,7 +69,7 @@ class MPC:
         else:
             self.num_controllers = self.B.shape[1]
 
-        # If we are generating data to train the model reduction neural net,
+        # If we are generating data to train the model reduction neural unet,
         # then initial x_i is randomly generated
         if gen_data:
             self.x = np.random.randint(low=-10, high=10, size=self.A.shape[0])
