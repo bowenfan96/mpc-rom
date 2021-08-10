@@ -8,7 +8,7 @@
 # Other codes: https://www.imperial.ac.uk/optimisation-and-machine-learning-for-process-engineering/codes/
 
 # To cite please use the publications [1,2,3,4] at the end of the document.
-
+import time
 
 import scipy.integrate as scp
 from pyomo.environ import *
@@ -19,6 +19,8 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 import pandas as pd
+
+import basinhopping
 
 
 #################################
@@ -136,6 +138,20 @@ def discretize(model, fe, cp, cp_in):
     # model.u[0.9].fix(3.40329642)
     # model.u[1].fix(3.60322947)
 
+    # GET RANDOM CONTROLS
+    # u_rng = np.random.uniform(low=-20, high=20, size=10)
+
+    # model.u[0.1].fix(u_rng[0])
+    # model.u[0.2].fix(u_rng[1])
+    # model.u[0.3].fix(u_rng[2])
+    # model.u[0.4].fix(u_rng[3])
+    # model.u[0.5].fix(u_rng[4])
+    # model.u[0.6].fix(u_rng[5])
+    # model.u[0.7].fix(u_rng[6])
+    # model.u[0.8].fix(u_rng[7])
+    # model.u[0.9].fix(u_rng[8])
+    # model.u[1].fix(u_rng[9])
+
     return discretizer, model
 
 
@@ -145,9 +161,9 @@ def discretize(model, fe, cp, cp_in):
 
 def solvemodel(model, solverofchoice):
     solver = po.SolverFactory(solverofchoice)
-    solver.solve(model)
+    results = solver.solve(model)
 
-    return model
+    return results, model
 
 
 #####################################
@@ -180,8 +196,8 @@ def presentresults(model):
     plt.plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label='path constraint for x2')
     plt.legend()
 
-    plt.show()
-    # plt.close()
+    # plt.show()
+    plt.close()
     print('Value of objective is {0}'.format(po.value(model.L[model.t.last()])))
     for time in model.t:
         print(po.value(model.L[time]))
@@ -191,36 +207,126 @@ def presentresults(model):
 nfe                = 10
 cp_in              = 1
 
-concat_df = pd.DataFrame(columns=["t", "x1", "x2", "u"])
+model_i = createmodel(t0=0, tf=1, x0=[0, -1], xtf=[])
 
-# GENERATE DATA
-for _ in range(1):
-    x1_init_rng = np.random.uniform(-10, 10)
-    x2_init_rng = np.random.uniform(-18.5, 1.5)
-
-    model_i            = createmodel(t0=0, tf=1, x0=[-4.269957139,	-10.90194926], xtf=[])
+for i in range(10):
     discretizer, model = discretize(model_i, nfe, 4, cp_in)
 
-    model              = solvemodel(model_i, 'ipopt')
-    model.display()
-    print('Number of finite elements: {0}'.format(nfe))
-    print('Number of collocation points for manipulated variable (u): {0}'.format(cp_in))
-    t, x1, x2, u = presentresults(model_i)
+    # Get
 
-    data_df = pd.DataFrame(
-        {"t": t,
-         "x1": x1,
-         "x2": x2,
-         "u": u
-        })
 
-    data_fe_intervals = data_df.iloc[::4, :]
-    # data_df.drop(index=data_df.iloc[5::4, :].index.tolist(), inplace=True)
+results, model = solvemodel(model_i, 'ipopt')
+model.display()
+print('Number of finite elements: {0}'.format(nfe))
+print('Number of collocation points for manipulated variable (u): {0}'.format(cp_in))
+t, x1, x2, u = presentresults(model_i)
 
-    # print(data_fe_intervals)
+print("Status:")
+print(results.solver.status)
 
-    concat_df = pd.concat([concat_df, data_fe_intervals])
 
-    print(concat_df)
 
-# concat_df.to_csv("simple_proper.csv", sep=',')
+
+
+
+# # GENERATE DATA
+# for _ in range(50):
+#     # x1_init_rng = np.random.uniform(-10, 10)
+#     # x2_init_rng = np.random.uniform(-18.5, 1.5)
+#
+#     model_i            = createmodel(t0=0, tf=1, x0=[0,	-1], xtf=[])
+#     discretizer, model = discretize(model_i, nfe, 4, cp_in)
+#
+#     results, model              = solvemodel(model_i, 'ipopt')
+#     model.display()
+#     print('Number of finite elements: {0}'.format(nfe))
+#     print('Number of collocation points for manipulated variable (u): {0}'.format(cp_in))
+#     t, x1, x2, u = presentresults(model_i)
+#
+#     print("Status:")
+#     print(results.solver.status)
+#
+#     # Only record trajectory if no constraint was broken, i.e. solver status = ok
+#
+#     if results.solver.status == "ok":
+#         data_df = pd.DataFrame(
+#             {"t": t,
+#              "x1": x1,
+#              "x2": x2,
+#              "u": u
+#             })
+#
+#         data_fe_intervals = data_df.iloc[::4, :]
+#         # data_df.drop(index=data_df.iloc[5::4, :].index.tolist(), inplace=True)
+#
+#         # print(data_fe_intervals)
+#         # Append ctg
+#
+#         def cost(x1, x2, u):
+#             return x1 ** 2 + x2 ** 2 + 5E-3 * u ** 2
+#
+#         cost_to_go = []
+#         data_fe_intervals_np = np.array(data_fe_intervals)
+#         for t in range(data_fe_intervals_np.shape[0]):
+#             cost_to_go.append(cost(data_fe_intervals_np[t][1], data_fe_intervals_np[t][2], data_fe_intervals_np[t][3]))
+#         for t in reversed(range(data_fe_intervals_np.shape[0] - 1)):
+#             cost_to_go[t] += cost_to_go[t + 1]
+#         cost_to_go = np.array(cost_to_go).reshape(-1, 1)
+#
+#         # print(data_fe_intervals_np)
+#         # print(cost_to_go)
+#         # time.sleep(5)
+#
+#         w_ctg = np.hstack((data_fe_intervals_np, cost_to_go))
+#
+#         # print(w_ctg)
+#         # time.sleep(5)
+#
+#         w_ctg_df = pd.DataFrame(
+#             {"t": w_ctg[:,0],
+#              "x1": w_ctg[:,1],
+#              "x2": w_ctg[:,2],
+#              "u": w_ctg[:,3],
+#              "ctg": w_ctg[:,4]
+#             })
+#
+#         concat_df = pd.concat([concat_df, w_ctg_df])
+#         print(concat_df)
+#
+#     #
+#     elif results.solver.status == "warning":
+#         data_df = pd.DataFrame(
+#             {"t": t,
+#              "x1": x1,
+#              "x2": x2,
+#              "u": u
+#             })
+#
+#         data_fe_intervals = data_df.iloc[::4, :]
+#
+#         def cost(x1, x2, u):
+#             return 10 * (x1 ** 2 + x2 ** 2 + 5E-3 * u ** 2)
+#
+#         cost_to_go = []
+#         data_fe_intervals_np = np.array(data_fe_intervals)
+#         for t in range(data_fe_intervals_np.shape[0]):
+#             cost_to_go.append(cost(data_fe_intervals_np[t][1], data_fe_intervals_np[t][2], data_fe_intervals_np[t][3]))
+#         for t in reversed(range(data_fe_intervals_np.shape[0] - 1)):
+#             cost_to_go[t] += cost_to_go[t + 1]
+#         cost_to_go = np.array(cost_to_go).reshape(-1, 1)
+#
+#         w_ctg = np.hstack((data_fe_intervals_np, cost_to_go))
+#
+#         w_ctg_df = pd.DataFrame(
+#             {"t": w_ctg[:,0],
+#              "x1": w_ctg[:,1],
+#              "x2": w_ctg[:,2],
+#              "u": w_ctg[:,3],
+#              "ctg": w_ctg[:,4]
+#             })
+#
+#         warn_concat_df = pd.concat([warn_concat_df, w_ctg_df])
+#         print(warn_concat_df)
+#
+# # concat_df.to_csv("simple_proper_rng_controls_init_fix.csv", sep=',')
+# # warn_concat_df.to_csv("simple_proper_rng_controls_init_fix_warn.csv", sep=',')

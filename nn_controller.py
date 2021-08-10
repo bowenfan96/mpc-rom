@@ -1,4 +1,5 @@
 import random
+import time
 
 import numpy
 import scipy.optimize
@@ -7,12 +8,14 @@ import numpy as np
 import pickle
 # Import mor_nn namespace for pickle to work
 import mor_nn
-from mor_nn import *
-
+# from mor_nn import *
+from simple_ctg_nn import *
 import pymoo
 import leap_ec
 
 from deap import base, creator, tools
+
+from scipy.optimize import Bounds
 
 
 class GdOpt:
@@ -27,16 +30,21 @@ class GdOpt:
         :param x_k: x_k_tilde parameters, fixed
         :return: optimal u_k_tilde parameters
         """
-        init_guess = np.random.randint(low=0, high=1000, size=1)  # u_tilde.size
+        init_guess = np.random.randint(low=19, high=20, size=1)  # u_tilde.size
 
         gd_options = {}
-        gd_options["maxiter"] = 1000
+        # gd_options["maxiter"] = 1000
         gd_options["disp"] = True
-        gd_options["eps"] = 10
+        # gd_options["eps"] = 1
 
-        result = scipy.optimize.minimize(
-            fun=self.nn_func, x0=init_guess, args=x_k,
-            options=gd_options
+        min_kwargs = {
+            "args": x_k,
+            "method": 'nelder-mead',
+            "options": gd_options
+        }
+
+        result = scipy.optimize.basinhopping(
+            func=self.nn_func, x0=[-19.8], minimizer_kwargs=min_kwargs
         )
 
         return result["x"]
@@ -48,9 +56,10 @@ class GdOpt:
         :param x_k: x_k_tilde, the reduced state variables
         :return: Cost to go, predicted using the neural unet
         """
-        x_tilde = x_k[0]
-        x_tilde = x_tilde.flatten()
-        ctg_pred = self.mor_nn.predict_ctg(x_tilde, u_k)
+        x = x_k[0]
+        x = np.array(x).flatten().reshape((1,2))
+        print(x)
+        ctg_pred = self.mor_nn.predict_ctg(x, u_k[0])
 
         print("nn_ctg_pred")
         print(ctg_pred)
@@ -139,7 +148,7 @@ class DeapOpt():
 class NnController:
     def __init__(self, x_k_init=None, optimizer='gd'):
         # Load pickle neural unet
-        with open('mor_nn.pickle', 'rb') as model:
+        with open('simple_proper_wctg.pickle', 'rb') as model:
             self.mor_nn = pickle.load(model)
 
         # Initial reduced state variables, x_k_tilde (CAN REMOVE I THINK)
@@ -159,28 +168,29 @@ class NnController:
         :return: Optimal control actions in full controller variables
         """
         # 1. Get x_tilde from x_full by passing through the neural unet
-        x_tilde = self.mor_nn.encode_x(x_full)
-        x_tilde = x_tilde.flatten()
-        print(x_tilde)
+        # x_tilde = self.mor_nn.encode_x(x_full)
+        # x_tilde = x_tilde.flatten()
+        # print(x_tilde)
         # 2. Get optimal controls given x_tilde
         if self.optimizer == 'gd':
-            u_tilde_opt = self.opt.scipy_opt(x_tilde)
+            u_tilde_opt = self.opt.scipy_opt(np.array(x_full))
         elif self.optimizer == 'deap':
             u_tilde_opt = self.opt.optimize()
 
         u_tilde_opt = numpy.array(u_tilde_opt)
         print("Hi im u tilde opt")
         print(u_tilde_opt)
+        return u_tilde_opt
 
         # 3. Decode optimal u_tilde into full set of controls
-        u_full_opt = self.mor_nn.decode_u(u_tilde_opt)
-        print("U FULL OPT")
-        print(u_full_opt)
-        return u_full_opt
+        # u_full_opt = self.mor_nn.decode_u(u_tilde_opt)
+        # print("U FULL OPT")
+        # print(u_full_opt)
+        # return u_full_opt
 
 
 if __name__ == "__main__":
     controller = NnController()
 
     print("RESULTS")
-    print(controller.get_controls(np.random.randint(low=-1000, high=1000, size=200).reshape(1, 200)))
+    print(controller.get_controls(np.array([0, -16]).reshape(1, 2)))
