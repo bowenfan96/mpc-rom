@@ -64,10 +64,10 @@ def concat_csv():
 
 
 def reshape_csv():
-    file = results_folder + "all_simple.csv"
+    file = "simple_proper_if_cleaned.csv"
     df = pd.read_csv(file, index_col=None, header=0)
-    df.drop(index=df.iloc[5::6, :].index.tolist(), inplace=True)
-    df.to_csv(results_folder + "all_simple_reshaped.csv")
+    df.drop(index=df.iloc[::10, :].index.tolist(), inplace=True)
+    df.to_csv("simple_proper_if_cleaned.csv")
 
 
 def plot_u_vs_ctg():
@@ -129,7 +129,7 @@ def predict_state_and_controls():
 
 if __name__ == "__main__":
     # predict_state_and_controls()
-    concat_csv()
-    # reshape_csv()
+    # concat_csv()
+    reshape_csv()
     # check_ctg()
     # plot_u_vs_ctg()

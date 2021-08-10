@@ -112,17 +112,29 @@ def discretize(model, fe, cp, cp_in):
     # model.u[0.9].fix(2.69432302)
     # model.u[1].fix(3.21533437)
 
-    model.u[0].fix(13.66394499)
-    model.u[0.1].fix(14.20041063)
-    model.u[0.2].fix(14.8043678)
-    model.u[0.3].fix(15.22740341)
-    model.u[0.4].fix(15.48928715)
-    model.u[0.5].fix(15.85557914)
-    model.u[0.6].fix(16.18091321)
-    model.u[0.7].fix(16.45137047)
-    model.u[0.8].fix(16.71366667)
-    model.u[0.9].fix(16.96693872)
-    model.u[1].fix(17.21033071)
+    # model.u[0].fix(13.66394499)
+    # model.u[0.1].fix(14.20041063)
+    # model.u[0.2].fix(14.8043678)
+    # model.u[0.3].fix(15.22740341)
+    # model.u[0.4].fix(15.48928715)
+    # model.u[0.5].fix(15.85557914)
+    # model.u[0.6].fix(16.18091321)
+    # model.u[0.7].fix(16.45137047)
+    # model.u[0.8].fix(16.71366667)
+    # model.u[0.9].fix(16.96693872)
+    # model.u[1].fix(17.21033071)
+
+    # model.u[0].fix(20.70174186)
+    # model.u[0.1].fix(20.20688981)
+    # model.u[0.2].fix(20.76074092)
+    # model.u[0.3].fix(20.51253288)
+    # model.u[0.4].fix(10.10454163)
+    # model.u[0.5].fix(2.56125446)
+    # model.u[0.6].fix(2.43778702)
+    # model.u[0.7].fix(2.76538845)
+    # model.u[0.8].fix(3.14020152)
+    # model.u[0.9].fix(3.40329642)
+    # model.u[1].fix(3.60322947)
 
     return discretizer, model
 
@@ -171,6 +183,8 @@ def presentresults(model):
     plt.show()
     # plt.close()
     print('Value of objective is {0}'.format(po.value(model.L[model.t.last()])))
+    for time in model.t:
+        print(po.value(model.L[time]))
 
     return t, x1, x2, u
 

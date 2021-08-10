@@ -36,24 +36,24 @@ class uNet(nn.Module):
         self.hidden1_layer = nn.Linear(x_dim, x_dim*4)
         self.hidden2_layer = nn.Linear(x_dim*4, x_dim*4)
         self.hidden3_layer = nn.Linear(x_dim*4, x_dim*4)
-        # self.hidden4_layer = nn.Linear(x_dim*8, x_dim*4)
-        # self.hidden5_layer = nn.Linear(x_dim*4, x_dim*2)
+        self.hidden4_layer = nn.Linear(x_dim*4, x_dim*4)
+        self.hidden5_layer = nn.Linear(x_dim*4, x_dim*4)
         self.output_layer = nn.Linear(x_dim*4, u_dim)
 
         nn.init.kaiming_uniform_(self.hidden1_layer.weight)
         nn.init.kaiming_uniform_(self.hidden2_layer.weight)
         nn.init.kaiming_uniform_(self.hidden3_layer.weight)
-        # nn.init.kaiming_uniform_(self.hidden4_layer.weight)
-        # nn.init.kaiming_uniform_(self.hidden5_layer.weight)
+        nn.init.kaiming_uniform_(self.hidden4_layer.weight)
+        nn.init.kaiming_uniform_(self.hidden5_layer.weight)
         nn.init.kaiming_uniform_(self.output_layer.weight)
 
     def forward(self, x_in):
         xu_h1 = F.leaky_relu(self.hidden1_layer(x_in))
-        xu_h2 = F.leaky_relu(self.hidden2_layer(xu_h1))
-        xu_h3 = F.leaky_relu(self.hidden3_layer(xu_h2))
-        # xu_h4 = F.leaky_relu(self.hidden4_layer(xu_h3))
-        # xu_h5 = F.leaky_relu(self.hidden5_layer(xu_h4))
-        u_out = (self.output_layer(xu_h3))
+        xu_h2 = F.relu(self.hidden2_layer(xu_h1))
+        xu_h3 = F.relu(self.hidden3_layer(xu_h2))
+        xu_h4 = F.leaky_relu(self.hidden4_layer(xu_h3))
+        xu_h5 = F.leaky_relu(self.hidden5_layer(xu_h4))
+        u_out = (self.output_layer(xu_h5))
 
         return u_out
 
@@ -101,41 +101,57 @@ class NnCtrlSim:
         self.xnet = xNet(x_dim, u_dim)
 
     def process_data(self, data):
-        x1 = data.filter(regex='x1')
-        x2 = data.filter(regex='x2')
-        u = data.filter(regex='u')
-        x1 = x1.to_numpy(dtype=np.float32)
-        x2 = x2.to_numpy(dtype=np.float32)
-        u = u.to_numpy(dtype=np.float32)
+        xi1 = data.filter(regex='xi1')
+        xi2 = data.filter(regex='xi2')
+        ui = data.filter(regex='ui')
+        xi1 = xi1.to_numpy(dtype=np.float32)
+        xi2 = xi2.to_numpy(dtype=np.float32)
+        ui = ui.to_numpy(dtype=np.float32)
+
+        xf1 = data.filter(regex='xf1')
+        xf2 = data.filter(regex='xf2')
+        uf = data.filter(regex='uf')
+        xf1 = xf1.to_numpy(dtype=np.float32)
+        xf2 = xf2.to_numpy(dtype=np.float32)
+        uf = uf.to_numpy(dtype=np.float32)
 
         self.scaler_x1 = preprocessing.MinMaxScaler()
         self.scaler_x2 = preprocessing.MinMaxScaler()
         self.scaler_u = preprocessing.MinMaxScaler()
 
-        self.scaler_x1.fit(x1)
-        self.scaler_x2.fit(x2)
-        self.scaler_u.fit(u)
+        self.scaler_x1.fit(xi1)
+        self.scaler_x2.fit(xi2)
+        self.scaler_u.fit(ui)
 
-        x1 = self.scaler_x1.transform(x1)
-        x2 = self.scaler_x2.transform(x2)
-        u = self.scaler_u.transform(u)
+        xi1 = self.scaler_x1.transform(xi1)
+        xi2 = self.scaler_x2.transform(xi2)
+        ui = self.scaler_u.transform(ui)
 
-        x1_tensor = torch.tensor(x1)
-        x2_tensor = torch.tensor(x2)
-        u_tensor = torch.tensor(u)
+        xf1 = self.scaler_x1.transform(xf1)
+        xf2 = self.scaler_x2.transform(xf2)
+        uf = self.scaler_u.transform(uf)
 
-        x_tensor = torch.hstack((x1_tensor, x2_tensor))
+        xi1_tensor = torch.tensor(xi1)
+        xi2_tensor = torch.tensor(xi2)
+        ui_tensor = torch.tensor(ui)
 
-        return x_tensor, u_tensor
+        xf1_tensor = torch.tensor(xf1)
+        xf2_tensor = torch.tensor(xf2)
+        uf_tensor = torch.tensor(uf)
+
+        xi_tensor = torch.hstack((xi1_tensor, xi2_tensor))
+        xf_tensor = torch.hstack((xf1_tensor, xf2_tensor))
+
+        return xi_tensor, ui_tensor, xf_tensor, uf_tensor
 
     def fit(self, data):
-        x, u = self.process_data(data)
+        xi, ui, xf, uf = self.process_data(data)
         self.unet.train()
         self.xnet.train()
 
         # Wrap the tensors into a dataset, then load the data
-        data_mb = torch.utils.data.TensorDataset(x, u)
-        data_loader = torch.utils.data.DataLoader(data_mb, batch_size=11)
+        data_mb = torch.utils.data.TensorDataset(xi, ui, xf, uf)
+        data_loader = torch.utils.data.DataLoader(data_mb, batch_size=9)
         # Create optimizer to use update rules
         u_optimizer = optim.SGD(self.unet.parameters(), lr=0.01)
         # Specify criterion used
@@ -146,14 +162,14 @@ class NnCtrlSim:
 
         for epoch in range(500):
             # Minibatch gradient descent
-            for x_mb, u_mb in data_loader:
+            for xi_mb, ui_mb, xf_mb, uf_mb in data_loader:
                 u_optimizer.zero_grad()
                 x_optimizer.zero_grad()
-                u_pred = self.unet(x_mb)
-                x_pred = self.xnet(x_mb, u_mb)
+                u_pred = self.unet(xi_mb)
+                x_pred = self.xnet(xi_mb, ui_mb)
 
-                uloss = u_criterion(u_pred, u_mb)
-                xloss = x_criterion(x_pred, x_mb)
+                uloss = u_criterion(u_pred, ui_mb)
+                xloss = x_criterion(x_pred, xf_mb)
 
                 uloss.backward()
                 xloss.backward()
@@ -162,11 +178,11 @@ class NnCtrlSim:
 
             # Test entire dataset at this epoch
             with torch.no_grad():
-                u_pred = self.unet(x)
-                x_pred = self.xnet(x, u)
+                u_pred = self.unet(xi)
+                x_pred = self.xnet(xi, ui)
 
-                uloss = u_criterion(u_pred, u)
-                xloss = x_criterion(x_pred, x)
+                uloss = u_criterion(u_pred, ui)
+                xloss = x_criterion(x_pred, xf)
 
                 print("Epoch " + str(epoch) + ": Loss is " + str(uloss), str(xloss))
 
@@ -255,18 +271,20 @@ def predict():
         u_curr = predict_model.predict_u(x)
         u.append(u_curr)
         x = predict_model.predict_x(x, u)
+        print(x)
 
     plt.plot(np.array(u).flatten())
     print(np.array(u).flatten())
     plt.show()
 
-if __name__ == "__main__":
-    data = pd.read_csv("simple_proper.csv", sep=',')
-    rom = NnCtrlSim(2, 1)
-    rom.fit(data)
-    # Print a model.summary to show hidden layer information
-    summary(rom.unet.to("cpu"), verbose=2)
 
-    pickle_mor_nn(rom)
-    # predict()
+if __name__ == "__main__":
+    # data = pd.read_csv("simple_proper_if_cleaned.csv", sep=',')
+    # rom = NnCtrlSim(2, 1)
+    # rom.fit(data)
+    # Print a model.summary to show hidden layer information
+    # summary(rom.unet.to("cpu"), verbose=2)
+
+    # pickle_mor_nn(rom)
+    predict()
 
