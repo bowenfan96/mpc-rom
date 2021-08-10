@@ -33,28 +33,28 @@ class uNet(nn.Module):
         # self.hidden5_layer = nn.Linear(self.num_nodes*4, self.num_nodes*2)
         # self.output_layer = nn.Linear(self.num_nodes*2, self.num_nodes)
 
-        self.hidden1_layer = nn.Linear((x_dim+u_dim), x_dim * 4)
+        self.input_layer = nn.Linear((x_dim + u_dim), x_dim * 4)
         self.hidden2_layer = nn.Linear(x_dim * 4, x_dim * 4)
         self.hidden3_layer = nn.Linear(x_dim * 4, x_dim * 4)
-        self.hidden4_layer = nn.Linear(x_dim*4, x_dim*4)
-        self.hidden5_layer = nn.Linear(x_dim*4, x_dim*4)
+        # self.hidden4_layer = nn.Linear(x_dim*4, x_dim*4)
+        # self.hidden5_layer = nn.Linear(x_dim*4, x_dim*4)
         self.output_layer = nn.Linear(x_dim * 4, 1)
 
-        nn.init.kaiming_uniform_(self.hidden1_layer.weight)
+        nn.init.kaiming_uniform_(self.input_layer.weight)
         nn.init.kaiming_uniform_(self.hidden2_layer.weight)
         nn.init.kaiming_uniform_(self.hidden3_layer.weight)
-        nn.init.kaiming_uniform_(self.hidden4_layer.weight)
-        nn.init.kaiming_uniform_(self.hidden5_layer.weight)
-        nn.init.kaiming_uniform_(self.output_layer.weight)
+        # nn.init.kaiming_uniform_(self.hidden4_layer.weight)
+        # nn.init.kaiming_uniform_(self.hidden5_layer.weight)
+        # nn.init.kaiming_uniform_(self.output_layer.weight)
 
     def forward(self, x_in, u_in):
         xu_in = torch.hstack((x_in, u_in))
-        xu_h1 = F.leaky_relu(self.hidden1_layer(xu_in))
+        xu_h1 = F.leaky_relu(self.input_layer(xu_in))
         xu_h2 = F.leaky_relu(self.hidden2_layer(xu_h1))
         xu_h3 = F.leaky_relu(self.hidden3_layer(xu_h2))
-        xu_h4 = F.leaky_relu(self.hidden4_layer(xu_h3))
-        xu_h5 = F.leaky_relu(self.hidden5_layer(xu_h4))
-        x_out = (self.output_layer(xu_h5))
+        # xu_h4 = F.leaky_relu(self.hidden4_layer(xu_h3))
+        # xu_h5 = F.leaky_relu(self.hidden5_layer(xu_h4))
+        x_out = (self.output_layer(xu_h3))
 
         return x_out
 
@@ -120,9 +120,9 @@ class NnCtrlSim:
 
         # Wrap the tensors into a dataset, then load the data
         data_mb = torch.utils.data.TensorDataset(x, u, ctg)
-        data_loader = torch.utils.data.DataLoader(data_mb, batch_size=10, shuffle=True)
+        data_loader = torch.utils.data.DataLoader(data_mb, batch_size=20, shuffle=True)
         # Create optimizer to use update rules
-        u_optimizer = optim.SGD(self.unet.parameters(), lr=0.005)
+        u_optimizer = optim.SGD(self.unet.parameters(), lr=0.05)
         # Specify criterion used
         u_criterion = nn.MSELoss()
 
@@ -200,10 +200,10 @@ class NnCtrlSim:
         :param u_rom:
         :return:
         """
-        print("Hi imma x_rom")
-        print(x_rom)
-        print("Hi imma u_rom")
-        print(u_rom)
+        # print("Hi imma x_rom")
+        # print(x_rom)
+        # print("Hi imma u_rom")
+        # print(u_rom)
 
         x1 = x_rom[0][0]
         x2 = x_rom[0][1]

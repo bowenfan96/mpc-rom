@@ -20,8 +20,9 @@ import numpy as np
 
 import pandas as pd
 
-import basinhopping
-
+# import basinhopping
+from simple_ctg_nn import *
+import gridsearch
 
 #################################
 # function that defines problem #
@@ -181,23 +182,25 @@ def presentresults(model):
         u.append(po.value(model.u[time]))
         x2.append(po.value(model.x2[time]))
 
-    plt.figure(figsize=(10, 10))
+    fig, axs = plt.subplots(3, constrained_layout=True)
+    fig.set_size_inches(5, 10)
 
-    plt.subplot(2, 2, 1)
-    plt.plot(t, x1, label='x1 trajectory')
-    plt.legend()
+    axs[0].plot(t, x1, label='$x_1$')
+    axs[0].legend()
 
-    plt.subplot(2, 2, 2)
-    plt.plot(t, u, label='u profile')
-    plt.legend()
+    axs[1].plot(t, x2, label='$x_2$')
+    axs[1].plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label='Path constraint for $x_2$')
+    axs[1].legend()
 
-    plt.subplot(2, 2, 3)
-    plt.plot(t, x2, label='x2')
-    plt.plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label='path constraint for x2')
-    plt.legend()
+    axs[2].plot(t, u, label='Neural net controller action')
+    axs[2].legend()
 
-    # plt.show()
-    plt.close()
+    fig.suptitle('Control policy and system state after 20 rounds of training')
+    plt.xlabel("Time")
+    plt.show()
+
+
+    # plt.close()
     print('Value of objective is {0}'.format(po.value(model.L[model.t.last()])))
     for time in model.t:
         print(po.value(model.L[time]))
@@ -208,14 +211,24 @@ nfe                = 10
 cp_in              = 1
 
 model_i = createmodel(t0=0, tf=1, x0=[0, -1], xtf=[])
+discretizer, model = discretize(model_i, nfe, 4, cp_in)
 
-for i in range(10):
-    discretizer, model = discretize(model_i, nfe, 4, cp_in)
+for i in range(11):
+    x1 = po.value(model.x1[i/10])
+    x2 = po.value(model.x2[i/10])
+    # Get controls from basinhopping
+    gs = gridsearch.GridSearch()
+    u_opt = gs.search([x1, x2])
 
-    # Get
+    for time in model.t:
+        if i/10 <= time < (i+1)/10:
+            model.u[time].fix(u_opt)
+
+    results, model = solvemodel(model_i, 'ipopt')
+
+# results, model = solvemodel(model_i, 'ipopt')
 
 
-results, model = solvemodel(model_i, 'ipopt')
 model.display()
 print('Number of finite elements: {0}'.format(nfe))
 print('Number of collocation points for manipulated variable (u): {0}'.format(cp_in))
@@ -224,12 +237,45 @@ t, x1, x2, u = presentresults(model_i)
 print("Status:")
 print(results.solver.status)
 
+data_df = pd.DataFrame(
+    {"t": t,
+     "x1": x1,
+     "x2": x2,
+     "u": u
+     })
+
+data_fe_intervals = data_df.iloc[::4, :]
+# data_fe_intervals.to_csv("run1.csv", sep=",")
+# Append ctg
+#
+def _cost(cx1, cx2, cu):
+    return cx1 ** 2 + cx2 ** 2 + 5E-3 * cu ** 2
+
+cost_to_go = []
+data_fe_intervals_np = np.array(data_fe_intervals)
+for t in range(data_fe_intervals_np.shape[0]):
+    cost_to_go.append(_cost(data_fe_intervals_np[t][1], data_fe_intervals_np[t][2], data_fe_intervals_np[t][3]))
+for t in reversed(range(data_fe_intervals_np.shape[0] - 1)):
+    cost_to_go[t] += cost_to_go[t + 1]
+cost_to_go = np.array(cost_to_go).reshape(-1, 1)
+
+# print(data_fe_intervals_np)
+# print(cost_to_go)
+# time.sleep(5)
+
+w_ctg = np.hstack((data_fe_intervals_np, cost_to_go))
+w_ctg_df = pd.DataFrame(
+            {"t": w_ctg[:,0],
+             "x1": w_ctg[:,1],
+             "x2": w_ctg[:,2],
+             "u": w_ctg[:,3],
+             "ctg": w_ctg[:,4]
+            })
+
+w_ctg_df.to_csv("run20.csv", sep=',')
 
 
-
-
-
-# # GENERATE DATA
+# GENERATE DATA
 # for _ in range(50):
 #     # x1_init_rng = np.random.uniform(-10, 10)
 #     # x2_init_rng = np.random.uniform(-18.5, 1.5)
@@ -327,6 +373,6 @@ print(results.solver.status)
 #
 #         warn_concat_df = pd.concat([warn_concat_df, w_ctg_df])
 #         print(warn_concat_df)
-#
-# # concat_df.to_csv("simple_proper_rng_controls_init_fix.csv", sep=',')
-# # warn_concat_df.to_csv("simple_proper_rng_controls_init_fix_warn.csv", sep=',')
+
+# concat_df.to_csv("simple_proper_rng_controls_init_fix.csv", sep=',')
+# warn_concat_df.to_csv("simple_proper_rng_controls_init_fix_warn.csv", sep=',')
