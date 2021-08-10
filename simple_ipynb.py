@@ -220,6 +220,9 @@ for i in range(11):
     gs = gridsearch.GridSearch()
     u_opt = gs.search([x1, x2])
 
+    # ADD SOME NOISE
+    u_opt += np.random.uniform(-0.5, 0.5)
+
     for time in model.t:
         if i/10 <= time < (i+1)/10:
             model.u[time].fix(u_opt)
