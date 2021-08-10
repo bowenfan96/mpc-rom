@@ -10,6 +10,7 @@
 # To cite please use the publications [1,2,3,4] at the end of the document.
 import time
 
+import pyomo.dae
 import scipy.integrate as scp
 from pyomo.environ import *
 
@@ -210,172 +211,28 @@ def presentresults(model):
 nfe                = 10
 cp_in              = 1
 
-model_i = createmodel(t0=0, tf=1, x0=[0, -1], xtf=[])
-discretizer, model = discretize(model_i, nfe, 4, cp_in)
+model = createmodel(t0=0, tf=1, x0=[0, -1], xtf=[])
 
-for i in range(11):
-    x1 = po.value(model.x1[i/10])
-    x2 = po.value(model.x2[i/10])
-    # Get controls from basinhopping
-    gs = gridsearch.GridSearch()
-    u_opt = gs.search([x1, x2])
 
-    # ADD SOME NOISE
-    u_opt += np.random.uniform(-1, 1)
+u_profile = {0: 0, 0.1: 8, 0.2: 1.6, 0.3: -2, 0.4: -2.2, 0.5: -1, 0.6: 0, 0.7: 2, 0.8: 0,
+             0.9: 0, 1.0: 0}
+model.var_input = Suffix(direction=Suffix.LOCAL)
+model.var_input[model.u] = u_profile
 
-    for time in model.t:
-        if i/10 <= time < (i+1)/10:
-            model.u[time].fix(u_opt)
+# discretizer, model = discretize(model, nfe, 4, cp_in)
 
-    results, model = solvemodel(model_i, 'ipopt')
+sim = pod.Simulator(model, package='casadi')
+tsim, profiles = sim.simulate(numpoints=11, varying_inputs=model.var_input)
+
+print(tsim)
+print(profiles)
 
 # results, model = solvemodel(model_i, 'ipopt')
 
-
-model.display()
+# model.display()
 print('Number of finite elements: {0}'.format(nfe))
 print('Number of collocation points for manipulated variable (u): {0}'.format(cp_in))
-t, x1, x2, u = presentresults(model_i)
+# t, x1, x2, u = presentresults(model_i)
 
-print("Status:")
-print(results.solver.status)
-
-data_df = pd.DataFrame(
-    {"t": t,
-     "x1": x1,
-     "x2": x2,
-     "u": u
-     })
-
-data_fe_intervals = data_df.iloc[::4, :]
-# data_fe_intervals.to_csv("run1.csv", sep=",")
-# Append ctg
-#
-def _cost(cx1, cx2, cu):
-    return cx1 ** 2 + cx2 ** 2 + 5E-3 * cu ** 2
-
-cost_to_go = []
-data_fe_intervals_np = np.array(data_fe_intervals)
-for t in range(data_fe_intervals_np.shape[0]):
-    cost_to_go.append(_cost(data_fe_intervals_np[t][1], data_fe_intervals_np[t][2], data_fe_intervals_np[t][3]))
-for t in reversed(range(data_fe_intervals_np.shape[0] - 1)):
-    cost_to_go[t] += cost_to_go[t + 1]
-cost_to_go = np.array(cost_to_go).reshape(-1, 1)
-
-# print(data_fe_intervals_np)
-# print(cost_to_go)
-# time.sleep(5)
-
-w_ctg = np.hstack((data_fe_intervals_np, cost_to_go))
-w_ctg_df = pd.DataFrame(
-            {"t": w_ctg[:,0],
-             "x1": w_ctg[:,1],
-             "x2": w_ctg[:,2],
-             "u": w_ctg[:,3],
-             "ctg": w_ctg[:,4]
-            })
-
-w_ctg_df.to_csv("run20.csv", sep=',')
-
-
-# GENERATE DATA
-# for _ in range(50):
-#     # x1_init_rng = np.random.uniform(-10, 10)
-#     # x2_init_rng = np.random.uniform(-18.5, 1.5)
-#
-#     model_i            = createmodel(t0=0, tf=1, x0=[0,	-1], xtf=[])
-#     discretizer, model = discretize(model_i, nfe, 4, cp_in)
-#
-#     results, model              = solvemodel(model_i, 'ipopt')
-#     model.display()
-#     print('Number of finite elements: {0}'.format(nfe))
-#     print('Number of collocation points for manipulated variable (u): {0}'.format(cp_in))
-#     t, x1, x2, u = presentresults(model_i)
-#
-#     print("Status:")
-#     print(results.solver.status)
-#
-#     # Only record trajectory if no constraint was broken, i.e. solver status = ok
-#
-#     if results.solver.status == "ok":
-#         data_df = pd.DataFrame(
-#             {"t": t,
-#              "x1": x1,
-#              "x2": x2,
-#              "u": u
-#             })
-#
-#         data_fe_intervals = data_df.iloc[::4, :]
-#         # data_df.drop(index=data_df.iloc[5::4, :].index.tolist(), inplace=True)
-#
-#         # print(data_fe_intervals)
-#         # Append ctg
-#
-#         def cost(x1, x2, u):
-#             return x1 ** 2 + x2 ** 2 + 5E-3 * u ** 2
-#
-#         cost_to_go = []
-#         data_fe_intervals_np = np.array(data_fe_intervals)
-#         for t in range(data_fe_intervals_np.shape[0]):
-#             cost_to_go.append(cost(data_fe_intervals_np[t][1], data_fe_intervals_np[t][2], data_fe_intervals_np[t][3]))
-#         for t in reversed(range(data_fe_intervals_np.shape[0] - 1)):
-#             cost_to_go[t] += cost_to_go[t + 1]
-#         cost_to_go = np.array(cost_to_go).reshape(-1, 1)
-#
-#         # print(data_fe_intervals_np)
-#         # print(cost_to_go)
-#         # time.sleep(5)
-#
-#         w_ctg = np.hstack((data_fe_intervals_np, cost_to_go))
-#
-#         # print(w_ctg)
-#         # time.sleep(5)
-#
-#         w_ctg_df = pd.DataFrame(
-#             {"t": w_ctg[:,0],
-#              "x1": w_ctg[:,1],
-#              "x2": w_ctg[:,2],
-#              "u": w_ctg[:,3],
-#              "ctg": w_ctg[:,4]
-#             })
-#
-#         concat_df = pd.concat([concat_df, w_ctg_df])
-#         print(concat_df)
-#
-#     #
-#     elif results.solver.status == "warning":
-#         data_df = pd.DataFrame(
-#             {"t": t,
-#              "x1": x1,
-#              "x2": x2,
-#              "u": u
-#             })
-#
-#         data_fe_intervals = data_df.iloc[::4, :]
-#
-#         def cost(x1, x2, u):
-#             return 10 * (x1 ** 2 + x2 ** 2 + 5E-3 * u ** 2)
-#
-#         cost_to_go = []
-#         data_fe_intervals_np = np.array(data_fe_intervals)
-#         for t in range(data_fe_intervals_np.shape[0]):
-#             cost_to_go.append(cost(data_fe_intervals_np[t][1], data_fe_intervals_np[t][2], data_fe_intervals_np[t][3]))
-#         for t in reversed(range(data_fe_intervals_np.shape[0] - 1)):
-#             cost_to_go[t] += cost_to_go[t + 1]
-#         cost_to_go = np.array(cost_to_go).reshape(-1, 1)
-#
-#         w_ctg = np.hstack((data_fe_intervals_np, cost_to_go))
-#
-#         w_ctg_df = pd.DataFrame(
-#             {"t": w_ctg[:,0],
-#              "x1": w_ctg[:,1],
-#              "x2": w_ctg[:,2],
-#              "u": w_ctg[:,3],
-#              "ctg": w_ctg[:,4]
-#             })
-#
-#         warn_concat_df = pd.concat([warn_concat_df, w_ctg_df])
-#         print(warn_concat_df)
-
-# concat_df.to_csv("simple_proper_rng_controls_init_fix.csv", sep=',')
-# warn_concat_df.to_csv("simple_proper_rng_controls_init_fix_warn.csv", sep=',')
+# print("Status:")
+# print(results.solver.status)
