@@ -196,8 +196,8 @@ def train_and_pickle(round_num):
     data = pd.read_csv("simple_60_trajectories_df.csv")
     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
     simple_nn.fit(data)
-    pickle_model(simple_nn, round_num)
-
+    pickle_filename = pickle_model(simple_nn, round_num)
+    return pickle_filename
 
 # if __name__ == "__main__":
 #     data = pd.read_csv("simple_60_trajectories_df.csv")
