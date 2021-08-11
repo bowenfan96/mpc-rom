@@ -1,4 +1,4 @@
-# Citation: Adapted from https://colab.research.google.com/drive/17KJn7tVyQ3nXlGSGEJ0z6DcpRnRd0VRp
+# Citation: The system is taken from https://colab.research.google.com/drive/17KJn7tVyQ3nXlGSGEJ0z6DcpRnRd0VRp
 import datetime
 
 import numpy as np
