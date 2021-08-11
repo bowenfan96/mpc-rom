@@ -1,5 +1,6 @@
 # Citation: The system is taken from https://colab.research.google.com/drive/17KJn7tVyQ3nXlGSGEJ0z6DcpRnRd0VRp
 import datetime
+import pickle
 
 import numpy as np
 import pandas as pd
@@ -8,7 +9,7 @@ from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
 
-import datetime
+from simple_nn_controller import *
 
 
 class SimpleSimulator:
@@ -235,8 +236,8 @@ class SimpleSimulator:
 
             # Update current_x to the next state output by the simulator
             if i < 10:
-                current_x[0] = x0[i+1, 0]
-                current_x[1] = x1[i+1, 1]
+                current_x[0] = x0[i+1]
+                current_x[1] = x1[i+1]
 
         # Make dataframe from the final simulator results
         t = deduplicate_df["t"]
@@ -348,5 +349,16 @@ def generate_trajectories(save_csv=False):
     violate_path_df.to_csv("violate_path_df.csv")
 
 
+def load_pickle(filename):
+    with open(filename, "rb") as model:
+        pickled_nn_model = pickle.load(model)
+    return pickled_nn_model
+
+
 if __name__ == "__main__":
-    generate_trajectories(save_csv=True)
+    # generate_trajectories(save_csv=True)
+    simple_sys = SimpleSimulator()
+    nn_model = load_pickle("simple_nn_controller.pickle")
+    _, res = simple_sys.simulate_system_nn_controls(nn_model)
+
+    print(res)
