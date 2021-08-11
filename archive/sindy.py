@@ -6,7 +6,7 @@ matrices_folder = "matrices/"
 results_folder = "results_csv/"
 plots_folder = "results_plots/"
 
-data = pd.read_csv("simple_proper.csv", sep=',')
+data = pd.read_csv("simple_system_unsorted_data/simple_proper.csv", sep=',')
 
 # dt = 1/6
 

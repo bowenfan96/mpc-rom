@@ -67,7 +67,7 @@ def concat_csv():
 
 
 def reshape_csv():
-    file = "simple_proper_rng_controls_init_fix.csv"
+    file = "simple_system_unsorted_data/simple_proper_rng_controls_init_fix.csv"
     df = pd.read_csv(file, index_col=None, header=0)
     df.drop(index=df.iloc[::11, :].index.tolist(), inplace=True)
     df.to_csv("simple_proper_rng_controls_init_fix_clean.csv")
@@ -75,7 +75,7 @@ def reshape_csv():
 
 def plot_u_vs_ctg():
     # Load pickle neural unet
-    with open('simple_proper_wctg.pickle', 'rb') as model:
+    with open('simple_system_unsorted_data/simple_proper_wctg.pickle', 'rb') as model:
         mor_nn = pickle.load(model)
     u_full = np.linspace(start=-20, stop=20, num=41)
 
@@ -131,7 +131,7 @@ def predict_state_and_controls():
 
 
 def append_ctg():
-    data = pd.read_csv("simple_proper_rng_controls.csv", sep=',')
+    data = pd.read_csv("simple_system_unsorted_data/simple_proper_rng_controls.csv", sep=',')
     # split_points = data.iloc[10::11, :]
     # print(split_points)
 

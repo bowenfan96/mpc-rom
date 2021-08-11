@@ -148,7 +148,7 @@ class DeapOpt():
 class NnController:
     def __init__(self, x_k_init=None, optimizer='gd'):
         # Load pickle neural unet
-        with open('simple_proper_wctg.pickle', 'rb') as model:
+        with open('simple_system_unsorted_data/simple_proper_wctg.pickle', 'rb') as model:
             self.mor_nn = pickle.load(model)
 
         # Initial reduced state variables, x_k_tilde (CAN REMOVE I THINK)

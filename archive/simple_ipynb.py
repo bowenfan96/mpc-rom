@@ -8,21 +8,14 @@
 # Other codes: https://www.imperial.ac.uk/optimisation-and-machine-learning-for-process-engineering/codes/
 
 # To cite please use the publications [1,2,3,4] at the end of the document.
-import time
-
-import scipy.integrate as scp
-from pyomo.environ import *
 
 from pyomo import environ as po
 from pyomo import dae as pod
-from matplotlib import pyplot as plt
-import numpy as np
-
-import pandas as pd
 
 # import basinhopping
 from simple_ctg_nn import *
-import gridsearch
+from archive import gridsearch
+
 
 #################################
 # function that defines problem #
@@ -275,7 +268,7 @@ w_ctg_df = pd.DataFrame(
              "ctg": w_ctg[:,4]
             })
 
-w_ctg_df.to_csv("run20.csv", sep=',')
+# w_ctg_df.to_csv("run20.csv", sep=',')
 
 
 # GENERATE DATA

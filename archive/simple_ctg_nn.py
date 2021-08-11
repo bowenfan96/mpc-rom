@@ -239,7 +239,7 @@ def pickle_mor_nn(mor_nn_trained):
     :param mor_nn_trained: Trained model reduction neural unet
     :return: Save the pickled file
     """
-    with open('simple_proper_wctg.pickle', 'wb') as model:
+    with open('simple_system_unsorted_data/simple_proper_wctg.pickle', 'wb') as model:
         pickle.dump(mor_nn_trained, model)
     print("\nSaved model to simple_proper_wctg.pickle\n")
 
@@ -277,7 +277,7 @@ def predict():
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("simple_proper_rng_controls_init_fix_clean.csv", sep=',')
+    data = pd.read_csv("simple_system_unsorted_data/simple_proper_rng_controls_init_fix_clean.csv", sep=',')
     rom = NnCtrlSim(2, 1)
     rom.fit(data)
     # Print a model.summary to show hidden layer information

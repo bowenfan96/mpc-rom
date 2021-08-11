@@ -7,7 +7,7 @@ from simple_ctg_nn import *
 
 class GridSearch:
     def __init__(self):
-        with open('simple_proper_wctg.pickle', 'rb') as model:
+        with open('simple_system_unsorted_data/simple_proper_wctg.pickle', 'rb') as model:
             self.predict_model = pickle.load(model)
 
     def search(self, x):
