@@ -378,10 +378,11 @@ def load_pickle(filename):
 def replay(trajectory_df_filename, buffer_capacity=90):
     # Use this to keep track where to push out old data
     forgotten_trajectories_count = 0
+    pickle_filename = "simple_nn_controller.pickle"
 
     for rp_round in range(15):
         trajectory_df = pd.read_csv(trajectory_df_filename, sep=",")
-        nn_model = load_pickle("simple_nn_controller.pickle")
+        nn_model = load_pickle(pickle_filename)
         run_trajectories = []
 
         for run in range(6):
@@ -410,7 +411,7 @@ def replay(trajectory_df_filename, buffer_capacity=90):
 
         trajectory_df_filename = "R{} ".format(rp_round) + trajectory_df_filename
         trajectory_df.to_csv(trajectory_df_filename)
-        train_and_pickle()
+        pickle_filename = train_and_pickle(rp_round)
 
 
 if __name__ == "__main__":

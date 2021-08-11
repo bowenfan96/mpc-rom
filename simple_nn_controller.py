@@ -184,17 +184,19 @@ class SimpleNNController:
             return best_u_with_noise
 
 
-def pickle_model(model):
-    with open("simple_nn_controller.pickle", "wb") as file:
+def pickle_model(model, round_num):
+    pickle_filename = "R{}_".format(round_num) + "simple_nn_controller.pickle"
+    with open(pickle_filename, "wb") as file:
         pickle.dump(model, file)
-    print("Pickled model to simple_nn_controller.pickle")
+    print("Pickled model to " + pickle_filename)
+    return pickle_filename
 
 
-def train_and_pickle():
+def train_and_pickle(round_num):
     data = pd.read_csv("simple_60_trajectories_df.csv")
     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
     simple_nn.fit(data)
-    pickle_model(simple_nn)
+    pickle_model(simple_nn, round_num)
 
 
 # if __name__ == "__main__":
