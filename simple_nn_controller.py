@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "simple_replay_results/"
+results_folder = "simple_replay_results/hp/"
 
 
 class Net(nn.Module):

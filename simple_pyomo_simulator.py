@@ -12,7 +12,7 @@ from pyomo.solvers import *
 
 from simple_nn_controller import *
 
-results_folder = "simple_replay_results/"
+results_folder = "simple_replay_results/hp/"
 
 
 class SimpleSimulator:
@@ -410,6 +410,7 @@ def replay(trajectory_df_filename, buffer_capacity=120):
         # Decide whether to push out old memories
         if trajectory_df.shape[0] >= buffer_capacity * 10:
             # Get replace the 6 oldest trajectories with new data (60 rows at a time)
+            forgotten_trajectories_count = forgotten_trajectories_count % buffer_capacity
             row_slice_start = forgotten_trajectories_count * 10
             row_slice_end = row_slice_start + 60
 
