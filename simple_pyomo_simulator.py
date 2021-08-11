@@ -127,7 +127,6 @@ class SimpleSimulator:
     def simulate_system_rng_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
         u_rng = np.random.uniform(low=-20, high=20, size=11)
-        u_rng[0] = 0
 
         # Create a dictionary of piecewise linear controller actions
         u_rng_profile = {timesteps[i]: u_rng[i] for i in range(len(timesteps))}
@@ -161,10 +160,10 @@ class SimpleSimulator:
 
         for time in range(len(t)):
             # Instantaneous cost is L[t1] - L[t0]
-            if time == 0:
+            if time == 10:
                 inst_cost.append(0)
             else:
-                inst_cost.append(L[time] - L[time - 1])
+                inst_cost.append(L[time + 1] - L[time])
 
         # Calculate cost to go
         for time in range(len(t)):
@@ -186,9 +185,98 @@ class SimpleSimulator:
             {"t": t, "x0": x0, "x1": x1, "u": u, "L": L,
              "inst_cost": inst_cost, "ctg": ctg, "path_diff": path_violation}
         )
-        rng_sim_results_df_dropped_t0 = rng_sim_results_df.drop(index=0)
+        rng_sim_results_df_dropped_tf = rng_sim_results_df.drop(index=10)
 
-        return rng_sim_results_df, rng_sim_results_df_dropped_t0
+        return rng_sim_results_df, rng_sim_results_df_dropped_tf
+
+    def simulate_system_nn_controls(self, nn_model):
+        timesteps = [timestep / 10 for timestep in range(11)]
+        u_nn = np.zeros(11)
+        # Initial x values to be passed to the neural net at the first loop
+        current_x = [0, -1]
+
+        self.model.var_input = Suffix(direction=Suffix.LOCAL)
+
+        # Pyomo does not support simulating step by step, so we need to run 11 simulation loops
+        # At loop i, we get state x_i and discard subsequent states
+        # We call the neural net to predict the optimal u for x_i, then fix u time i
+        for i in range(11):
+            # Fetch optimal action, u, by calling the neural net with current_x
+            u_opt = nn_model.get_u_opt(current_x)
+
+            # Replace the control sequence of the current timestep with u_opt
+            u_nn[i] = u_opt
+
+            # Create a dictionary of piecewise linear controller actions
+            u_nn_profile = {timesteps[i]: u_nn[i] for i in range(len(timesteps))}
+
+            # Update the control sequence to Pyomo
+            self.model.var_input[self.model.u] = u_nn_profile
+
+            sim = Simulator(self.model, package="casadi")
+            tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
+
+            # For some reason both tsim and profiles contain duplicates
+            # Use pandas to drop the duplicates first
+            # profiles columns: x0, x1, L
+            deduplicate_df = pd.DataFrame(
+                {"t": tsim, "x0": profiles[:, 0], "x1": profiles[:, 1], "L": profiles[:, 2]}
+            )
+            deduplicate_df = deduplicate_df.round(10)
+            deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
+
+            # Make dataframe from the simulator results
+            t = deduplicate_df["t"]
+            x0 = deduplicate_df["x0"]
+            x1 = deduplicate_df["x1"]
+
+            # Check duplicates were removed correctly
+            assert len(t) == 11
+
+            # Update current_x to the next state output by the simulator
+            if i < 10:
+                current_x[0] = x0[i+1, 0]
+                current_x[1] = x1[i+1, 1]
+
+        # Make dataframe from the final simulator results
+        t = deduplicate_df["t"]
+        x0 = deduplicate_df["x0"]
+        x1 = deduplicate_df["x1"]
+        L = deduplicate_df["L"]
+        u = u_nn
+        inst_cost = []
+        ctg = []
+
+        for time in range(len(t)):
+            # Instantaneous cost is L[t1] - L[t0]
+            if time == 10:
+                inst_cost.append(0)
+            else:
+                inst_cost.append(L[time + 1] - L[time])
+
+        # Calculate cost to go
+        for time in range(len(t)):
+            ctg.append(inst_cost[time])
+        # Sum backwards from tf
+        for time in reversed(range(len(t) - 1)):
+            ctg[time] += ctg[time + 1]
+
+        # Calculate path violations
+        path = [x1[int(time * 10)] + 0.5 - 8 * (time - 0.5) ** 2 for time in t]
+        path_violation = []
+        for p in path:
+            if max(path) > 0:
+                path_violation.append(max(path))
+            else:
+                path_violation.append(p)
+
+        nn_sim_results_df = pd.DataFrame(
+            {"t": t, "x0": x0, "x1": x1, "u": u, "L": L,
+             "inst_cost": inst_cost, "ctg": ctg, "path_diff": path_violation}
+        )
+        nn_sim_results_df_dropped_tf = nn_sim_results_df.drop(index=10)
+
+        return nn_sim_results_df, nn_sim_results_df_dropped_tf
 
     @staticmethod
     def plot(dataframe, num_rounds=0):
@@ -217,43 +305,48 @@ class SimpleSimulator:
         return
 
 
-df_cols = ["t", "x0", "x1", "u", "L", "inst_cost", "ctg", "path_diff"]
-# 20 trajectories which obeyed the path constraint
-obey_path_df = pd.DataFrame(columns=df_cols)
-# 10 trajectories which violated the path constraint
-violate_path_df = pd.DataFrame(columns=df_cols)
-simple_30_trajectories_df = pd.DataFrame(columns=df_cols)
+def generate_trajectories(save_csv=False):
+    df_cols = ["t", "x0", "x1", "u", "L", "inst_cost", "ctg", "path_diff"]
+    # 40 trajectories which obeyed the path constraint
+    obey_path_df = pd.DataFrame(columns=df_cols)
+    # 20 trajectories which violated the path constraint
+    violate_path_df = pd.DataFrame(columns=df_cols)
+    simple_60_trajectories_df = pd.DataFrame(columns=df_cols)
 
-num_samples = 0
-num_good = 0
-num_bad = 0
-
-while num_samples < 30:
-
-    while num_good < 2:
-        simple_sys = SimpleSimulator()
-        _, trajectory = simple_sys.simulate_system_rng_controls()
-        if trajectory["path_diff"].max() < 0:
-            simple_30_trajectories_df = pd.concat([simple_30_trajectories_df, trajectory])
-            obey_path_df = pd.concat([obey_path_df, trajectory])
-            num_good += 1
-            num_samples += 1
-
-    while num_bad < 1:
-        simple_sys = SimpleSimulator()
-        _, trajectory = simple_sys.simulate_system_rng_controls()
-        if trajectory["path_diff"].max() >= 0:
-            simple_30_trajectories_df = pd.concat([simple_30_trajectories_df, trajectory])
-            violate_path_df = pd.concat([violate_path_df, trajectory])
-            num_bad += 1
-            num_samples += 1
-
-    # Reset
+    num_samples = 0
     num_good = 0
     num_bad = 0
 
-    print("Samples: ", num_samples)
+    while num_samples < 60:
 
-simple_30_trajectories_df.to_csv("simple_30_trajectories_df.csv")
-obey_path_df.to_csv("obey_path_df.csv")
-violate_path_df.to_csv("violate_path_df.csv")
+        while num_good < 2:
+            simple_sys = SimpleSimulator()
+            _, trajectory = simple_sys.simulate_system_rng_controls()
+            if trajectory["path_diff"].max() < 0:
+                simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
+                obey_path_df = pd.concat([obey_path_df, trajectory])
+                num_good += 1
+                num_samples += 1
+
+        while num_bad < 1:
+            simple_sys = SimpleSimulator()
+            _, trajectory = simple_sys.simulate_system_rng_controls()
+            if trajectory["path_diff"].max() >= 0:
+                simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
+                violate_path_df = pd.concat([violate_path_df, trajectory])
+                num_bad += 1
+                num_samples += 1
+
+        # Reset
+        num_good = 0
+        num_bad = 0
+
+        print("Samples: ", num_samples)
+
+    simple_60_trajectories_df.to_csv("simple_60_trajectories_df.csv")
+    obey_path_df.to_csv("obey_path_df.csv")
+    violate_path_df.to_csv("violate_path_df.csv")
+
+
+if __name__ == "__main__":
+    generate_trajectories(save_csv=True)
