@@ -400,7 +400,7 @@ def replay(trajectory_df_filename, buffer_capacity=90):
             for df_temp in run_trajectories:
                 df_temp_concat = pd.concat([df_temp_concat, df_temp])
 
-            trajectory_df.loc[row_slice_start:row_slice_end] = df_temp_concat.loc[0:60]
+            trajectory_df.iloc[row_slice_start:row_slice_end] = df_temp_concat.iloc[0:60]
             print(trajectory_df)
             forgotten_trajectories_count += 6
 
