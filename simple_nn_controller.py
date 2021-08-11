@@ -17,6 +17,8 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
+results_folder = "simple_replay_results/"
+
 
 class Net(nn.Module):
     def __init__(self, x_dim, u_dim, hidden_size=12):
@@ -104,7 +106,7 @@ class SimpleNNController:
         ctg_criterion = nn.MSELoss()
         cst_criterion = nn.MSELoss()
 
-        for epoch in range(500):
+        for epoch in range(300):
             for x_mb, u_mb, ctg_mb, cst_mb in mb_loader:
                 ctg_optimizer.zero_grad()
                 cst_optimizer.zero_grad()
@@ -185,15 +187,15 @@ class SimpleNNController:
 
 
 def pickle_model(model, round_num):
-    pickle_filename = "R{}_".format(round_num) + "simple_nn_controller.pickle"
+    pickle_filename = results_folder + "R{}_".format(round_num) + "simple_nn_controller.pickle"
     with open(pickle_filename, "wb") as file:
         pickle.dump(model, file)
     print("Pickled model to " + pickle_filename)
     return pickle_filename
 
 
-def train_and_pickle(round_num):
-    data = pd.read_csv("simple_60_trajectories_df.csv")
+def train_and_pickle(round_num, trajectory_df_filename="simple_60_trajectories_df.csv"):
+    data = pd.read_csv(trajectory_df_filename)
     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
     simple_nn.fit(data)
     pickle_filename = pickle_model(simple_nn, round_num)

@@ -409,9 +409,9 @@ def replay(trajectory_df_filename, buffer_capacity=90):
             for df_temp in run_trajectories:
                 trajectory_df = pd.concat([trajectory_df, df_temp])
 
-        trajectory_df_filename = "R{} ".format(rp_round+1) + trajectory_df_filename
+        trajectory_df_filename = results_folder + "R{} ".format(rp_round+1) + trajectory_df_filename
         trajectory_df.to_csv(trajectory_df_filename)
-        pickle_filename = train_and_pickle(rp_round)
+        pickle_filename = train_and_pickle(rp_round, trajectory_df_filename)
 
 
 if __name__ == "__main__":
