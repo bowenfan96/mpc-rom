@@ -1,4 +1,5 @@
 # Citation: The system model is taken from https://colab.research.google.com/drive/17KJn7tVyQ3nXlGSGEJ0z6DcpRnRd0VRp
+import csv
 import datetime
 import pickle
 
@@ -295,8 +296,9 @@ class SimpleSimulator:
         else:
             cst_status = "Fail"
 
+        # Check that the cost to go is equal to the Lagrangian cost integral
+        # assert np.isclose(ctg[0], dataframe["L"].iloc[-1], atol=0.01)
         total_cost = round(ctg[0], 3)
-        assert np.isclose(total_cost, round(dataframe["L"].max()), 3)
 
         fig, axs = plt.subplots(3, constrained_layout=True)
         fig.set_size_inches(5, 10)
@@ -377,20 +379,31 @@ def load_pickle(filename):
     return pickled_nn_model
 
 
-def replay(trajectory_df_filename, buffer_capacity=90):
+def replay(trajectory_df_filename, buffer_capacity=120):
     # Use this to keep track where to push out old data
     forgotten_trajectories_count = 0
     pickle_filename = "simple_nn_controller.pickle"
     og_trajectory_df_filename = trajectory_df_filename
 
-    for rp_round in range(15):
+    best_cost_after_n_rounds = {}
+
+    for rp_round in range(150):
         trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []
 
+        best_cost_in_round = np.inf
+
         for run in range(6):
             simple_sys = SimpleSimulator()
             df_1s, df_point9s = simple_sys.simulate_system_nn_controls(nn_model)
+
+            # Store the best result of this run if it passes constraints
+            run_cost = df_1s["ctg"][0]
+            run_constraint = df_1s["path_diff"].max()
+            if run_cost < best_cost_in_round and run_constraint <= 0:
+                best_cost_in_round = run_cost
+
             simple_sys.plot(df_1s, num_rounds=rp_round+1, num_run_in_round=run+1)
             run_trajectories.append(df_point9s)
 
@@ -415,6 +428,36 @@ def replay(trajectory_df_filename, buffer_capacity=90):
         trajectory_df_filename = "R{} ".format(rp_round+1) + og_trajectory_df_filename
         trajectory_df.to_csv(results_folder + trajectory_df_filename)
         pickle_filename = train_and_pickle(rp_round, results_folder + trajectory_df_filename)
+
+        # If best cost in round is better than current running best cost, add it to dictionary
+        if len(best_cost_after_n_rounds) == 0:
+            best_cost_after_n_rounds[rp_round] = best_cost_in_round
+        else:
+            best_key = min(best_cost_after_n_rounds, key=best_cost_after_n_rounds.get)
+            if best_cost_in_round < best_cost_after_n_rounds[best_key]:
+                best_cost_after_n_rounds[rp_round] = best_cost_in_round
+            else:
+                best_cost_after_n_rounds[rp_round] = best_cost_after_n_rounds[best_key]
+
+        # Plot best cost against rounds
+        # Unindent it to plot once, plotting every round and savings just in case anything fails
+        plt.plot(*zip(*sorted(best_cost_after_n_rounds.items())))
+        plt.title("Best cost obtained after each round")
+        plt.xlabel("Number of rounds")
+        plt.ylabel("Best cost obtained")
+        plot_filename = results_folder + "best_cost_plot.svg"
+        plt.savefig(fname=plot_filename, format="svg")
+        # plt.show()
+        plt.close()
+
+        # Save the best cost against rounds as a csv
+        best_cost_csv_filename = results_folder + "best_cost_plot.csv"
+        with open(best_cost_csv_filename, "w") as csv_file:
+            writer = csv.writer(csv_file)
+            for k, v in best_cost_after_n_rounds.items():
+                writer.writerow([k, v])
+
+    return
 
 
 if __name__ == "__main__":
