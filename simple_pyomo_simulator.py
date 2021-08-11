@@ -296,6 +296,7 @@ class SimpleSimulator:
             cst_status = "Fail"
 
         total_cost = round(ctg[0], 3)
+        assert np.isclose(total_cost, round(dataframe["L"].max()), 3)
 
         fig, axs = plt.subplots(3, constrained_layout=True)
         fig.set_size_inches(5, 10)
@@ -372,6 +373,7 @@ def generate_trajectories(save_csv=False):
 def load_pickle(filename):
     with open(filename, "rb") as model:
         pickled_nn_model = pickle.load(model)
+    print("Pickle loaded: " + filename)
     return pickled_nn_model
 
 
@@ -379,9 +381,10 @@ def replay(trajectory_df_filename, buffer_capacity=90):
     # Use this to keep track where to push out old data
     forgotten_trajectories_count = 0
     pickle_filename = "simple_nn_controller.pickle"
+    og_trajectory_df_filename = trajectory_df_filename
 
     for rp_round in range(15):
-        trajectory_df = pd.read_csv(trajectory_df_filename, sep=",")
+        trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []
 
@@ -409,9 +412,9 @@ def replay(trajectory_df_filename, buffer_capacity=90):
             for df_temp in run_trajectories:
                 trajectory_df = pd.concat([trajectory_df, df_temp])
 
-        trajectory_df_filename = results_folder + "R{} ".format(rp_round+1) + trajectory_df_filename
-        trajectory_df.to_csv(trajectory_df_filename)
-        pickle_filename = train_and_pickle(rp_round, trajectory_df_filename)
+        trajectory_df_filename = "R{} ".format(rp_round+1) + og_trajectory_df_filename
+        trajectory_df.to_csv(results_folder + trajectory_df_filename)
+        pickle_filename = train_and_pickle(rp_round, results_folder + trajectory_df_filename)
 
 
 if __name__ == "__main__":

@@ -169,7 +169,7 @@ class SimpleNNController:
         x = np.array(x).flatten().reshape((1, 2))
 
         if mode == "grid":
-            best_u = 0
+            best_u = -20
             best_ctg = np.inf
 
             for u in np.linspace(start=-20, stop=20, num=81):
@@ -187,14 +187,15 @@ class SimpleNNController:
 
 
 def pickle_model(model, round_num):
-    pickle_filename = results_folder + "R{}_".format(round_num) + "simple_nn_controller.pickle"
+    pickle_filename = results_folder + "R{}_".format(round_num+1) + "simple_nn_controller.pickle"
     with open(pickle_filename, "wb") as file:
         pickle.dump(model, file)
     print("Pickled model to " + pickle_filename)
     return pickle_filename
 
 
-def train_and_pickle(round_num, trajectory_df_filename="simple_60_trajectories_df.csv"):
+def train_and_pickle(round_num, trajectory_df_filename):
+    print("Training with dataset: " + trajectory_df_filename)
     data = pd.read_csv(trajectory_df_filename)
     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
     simple_nn.fit(data)
