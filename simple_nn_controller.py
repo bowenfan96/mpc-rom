@@ -177,11 +177,11 @@ class SimpleNNController:
                     best_ctg = ctg_pred
 
             # Add some noise to encourage exploration
-            best_u_with_noise = best_u + np.random.uniform(low=-0.5, high=0.5, size=None)
+            best_u_with_noise = best_u + np.random.uniform(low=-1, high=1, size=None)
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), round(best_u, 4), round(best_u_with_noise, 4))
                   )
-            return best_u
+            return best_u_with_noise
 
 
 def pickle_model(model):
@@ -190,9 +190,16 @@ def pickle_model(model):
     print("Pickled model to simple_nn_controller.pickle")
 
 
-if __name__ == "__main__":
+def train_and_pickle():
     data = pd.read_csv("simple_60_trajectories_df.csv")
     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
     simple_nn.fit(data)
-
     pickle_model(simple_nn)
+
+
+# if __name__ == "__main__":
+#     data = pd.read_csv("simple_60_trajectories_df.csv")
+#     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
+#     simple_nn.fit(data)
+#
+#     pickle_model(simple_nn)
