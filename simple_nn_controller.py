@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "simple_replay_results/vertex05/"
+results_folder = "simple_replay_results/120traj/"
 
 
 class Net(nn.Module):
@@ -99,14 +99,14 @@ class SimpleNNController:
         self.net.train()
 
         minibatch = torch.utils.data.TensorDataset(x, u, ctg, cst)
-        mb_loader = torch.utils.data.DataLoader(minibatch, batch_size=30, shuffle=False)
+        mb_loader = torch.utils.data.DataLoader(minibatch, batch_size=60, shuffle=False)
 
         ctg_optimizer = optim.SGD(self.net.parameters(), lr=0.05)
         cst_optimizer = optim.SGD(self.net.parameters(), lr=0.05)
         ctg_criterion = nn.MSELoss()
         cst_criterion = nn.MSELoss()
 
-        for epoch in range(300):
+        for epoch in range(500):
             for x_mb, u_mb, ctg_mb, cst_mb in mb_loader:
                 ctg_optimizer.zero_grad()
                 cst_optimizer.zero_grad()
@@ -202,9 +202,11 @@ def train_and_pickle(round_num, trajectory_df_filename):
     pickle_filename = pickle_model(simple_nn, round_num)
     return pickle_filename
 
-# if __name__ == "__main__":
-#     data = pd.read_csv("simple_60_trajectories_df.csv")
-#     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
-#     simple_nn.fit(data)
-#
-#     pickle_model(simple_nn)
+
+if __name__ == "__main__":
+    data = pd.read_csv("simple_120_trajectories_df.csv")
+    simple_nn = SimpleNNController(x_dim=2, u_dim=1)
+    simple_nn.fit(data)
+
+    with open("simple_nn_controller_120.pickle", "wb") as pickle_file:
+        pickle.dump(simple_nn, pickle_file)

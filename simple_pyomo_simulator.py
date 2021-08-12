@@ -12,7 +12,7 @@ from pyomo.solvers import *
 
 from simple_nn_controller import *
 
-results_folder = "simple_replay_results/vertex05/"
+results_folder = "simple_replay_results/120traj/"
 
 
 class SimpleSimulator:
@@ -341,7 +341,7 @@ def generate_trajectories(save_csv=False):
     num_good = 0
     num_bad = 0
 
-    while num_samples < 60:
+    while num_samples < 120:
 
         while num_good < 2:
             simple_sys = SimpleSimulator()
@@ -367,7 +367,7 @@ def generate_trajectories(save_csv=False):
 
         print("Samples: ", num_samples)
 
-    simple_60_trajectories_df.to_csv("simple_60_trajectories_df.csv")
+    simple_60_trajectories_df.to_csv("simple_120_trajectories_df.csv")
     obey_path_df.to_csv("obey_path_df.csv")
     violate_path_df.to_csv("violate_path_df.csv")
 
@@ -379,15 +379,15 @@ def load_pickle(filename):
     return pickled_nn_model
 
 
-def replay(trajectory_df_filename, buffer_capacity=120):
+def replay(trajectory_df_filename, buffer_capacity=240):
     # Use this to keep track where to push out old data
     forgotten_trajectories_count = 0
-    pickle_filename = "simple_nn_controller.pickle"
+    pickle_filename = "simple_nn_controller_120.pickle"
     og_trajectory_df_filename = trajectory_df_filename
 
     best_cost_after_n_rounds = {}
 
-    for rp_round in range(150):
+    for rp_round in range(90):
         trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []
@@ -470,4 +470,4 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    replay("simple_60_trajectories_df.csv")
+    replay("simple_120_trajectories_df.csv")
