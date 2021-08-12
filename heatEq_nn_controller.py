@@ -177,22 +177,23 @@ class HeatEqNNController:
         u = np.array(u, dtype=np.float32).flatten()
 
         # u must be between [73, 473], so if basinhopper tries an invalid u, we penalize the ctg
-        if not 73 <= u <= 473:
-            return np.inf, -np.inf
+        if not 73 <= u.any() <= 473:
+            return np.inf, np.inf
 
-        x0_scaled = self.scaler_x0.transform(x0)
-        x1_scaled = self.scaler_x1.transform(x1)
-        u_scaled = self.scaler_u.transform(u)
+        x_scaled = self.scaler_x.transform(x)
+        u0_scaled = self.scaler_u.transform(u[0])
+        u1_scaled = self.scaler_u.transform(u[1])
 
-        x0_tensor = torch.tensor(x0_scaled)
-        x1_tensor = torch.tensor(x1_scaled)
-        u_tensor = torch.tensor(u_scaled)
-        x_tensor = torch.hstack((x0_tensor, x1_tensor))
+        x_tensor = torch.tensor(x_scaled)
+        u0_tensor = torch.tensor(u0_scaled)
+        u1_tensor = torch.tensor(u1_scaled)
+        u_tensor = torch.hstack((u0_tensor, u1_tensor))
 
         self.x_mor.eval()
         self.net.eval()
         with torch.no_grad():
-            ctg_pred, cst_pred = self.net(x_tensor, u_tensor)
+            x_rom = self.x_mor(x_tensor)
+            ctg_pred, cst_pred = self.net(x_rom, u_tensor)
 
         ctg_pred = ctg_pred.detach().numpy()
         cst_pred = cst_pred.detach().numpy()
@@ -205,8 +206,8 @@ class HeatEqNNController:
 
         return ctg_pred, cst_pred
 
-    def get_u_opt(self, x, mode="basinhopper"):
-        x = np.array(x).flatten().reshape((1, 2))
+    def get_u_opt(self, x, mode="grid"):
+        x = np.array(x).flatten()
 
         if mode == "grid":
             best_u = [273, 273]
@@ -219,16 +220,17 @@ class HeatEqNNController:
                         best_u = [u0, u1]
                         best_ctg = ctg_pred
 
+            best_u = np.array(best_u).flatten()
             # Add some noise to encourage exploration
             best_u0_with_noise = best_u[0] + np.random.randint(low=-2, high=2, size=None)
             best_u1_with_noise = best_u[1] + np.random.randint(low=-2, high=2, size=None)
+            best_u_with_noise = np.array((best_u0_with_noise, best_u1_with_noise)).flatten()
             print("Best u given x = {} is {}, adding noise = {}"
-                  .format(x.flatten().round(4), round(best_u, 4), round(best_u_with_noise, 4))
+                  .format(x.flatten().round(4), best_u.round(4), best_u_with_noise.round(4))
                   )
             return best_u_with_noise
 
         elif mode == "basinhopper":
-
             def basinhopper_helper(u_bh, *arg_x_bh):
                 x_bh = arg_x_bh[0]
                 x_bh = np.array(x_bh).flatten()
@@ -256,12 +258,11 @@ class HeatEqNNController:
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
-
             return u_opt
 
 
 def pickle_model(model, round_num):
-    pickle_filename = results_folder + "R{}_".format(round_num+1) + "simple_nn_controller.pickle"
+    pickle_filename = results_folder + "R{}_".format(round_num+1) + "heatEq_nn_controller.pickle"
     with open(pickle_filename, "wb") as file:
         pickle.dump(model, file)
     print("Pickled model to " + pickle_filename)
@@ -279,8 +280,8 @@ def train_and_pickle(round_num, trajectory_df_filename):
 
 if __name__ == "__main__":
     data = pd.read_csv("heatEq_240_trajectories_df.csv")
-    simple_nn = HeatEqNNController(x_dim=20, x_rom_dim=10, u_dim=2)
-    simple_nn.fit(data)
+    heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=10, u_dim=2)
+    heatEq_nn.fit(data)
 
-    # with open("simple_nn_controller_120.pickle", "wb") as pickle_file:
-    #     pickle.dump(simple_nn, pickle_file)
+    with open("heatEq_nn_controller_240.pickle", "wb") as pickle_file:
+        pickle.dump(heatEq_nn, pickle_file)

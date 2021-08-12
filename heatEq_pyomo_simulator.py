@@ -381,7 +381,7 @@ class HeatEqSimulator:
 
         # For some reason both tsim and profiles contain duplicates
         # Use pandas to drop the duplicates first
-        # profiles columns: x0, x1, L
+        # profiles columns: x0, x1, ..., x19, L
         temp_dict = {"t": tsim}
         for i in range(20):
             temp_dict["x{}".format(i)] = profiles[:, i]
@@ -402,6 +402,7 @@ class HeatEqSimulator:
         inst_cost = []
         ctg = []
 
+        # Note: at this point, x is a list of 20 pandas series, each series has 11 rows
         # Check duplicates were removed correctly
         assert len(t) == 11
 
@@ -445,9 +446,10 @@ class HeatEqSimulator:
 
     def simulate_system_nn_controls(self, nn_model):
         timesteps = [timestep / 10 for timestep in range(11)]
-        u_nn = np.zeros(11)
+        u0_nn = np.zeros(11)
+        u1_nn = np.zeros(11)
         # Initial x values to be passed to the neural net at the first loop
-        current_x = [0, -1]
+        current_x = np.full(shape=(20, ), fill_value=273)
 
         self.model.var_input = Suffix(direction=Suffix.LOCAL)
 
@@ -459,45 +461,55 @@ class HeatEqSimulator:
             u_opt = nn_model.get_u_opt(current_x)
 
             # Replace the control sequence of the current timestep with u_opt
-            u_nn[i] = u_opt
+            u0_nn[i] = u_opt[0]
+            u1_nn[i] = u_opt[1]
 
             # Create a dictionary of piecewise linear controller actions
-            u_nn_profile = {timesteps[i]: u_nn[i] for i in range(len(timesteps))}
+            u0_nn_profile = {timesteps[i]: u0_nn[i] for i in range(len(timesteps))}
+            u1_nn_profile = {timesteps[i]: u1_nn[i] for i in range(len(timesteps))}
 
             # Update the control sequence to Pyomo
-            self.model.var_input[self.model.u] = u_nn_profile
+            self.model.var_input[self.model.u0] = u0_nn_profile
+            self.model.var_input[self.model.u1] = u1_nn_profile
 
             sim = Simulator(self.model, package="casadi")
             tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
 
             # For some reason both tsim and profiles contain duplicates
             # Use pandas to drop the duplicates first
-            # profiles columns: x0, x1, L
-            deduplicate_df = pd.DataFrame(
-                {"t": tsim, "x0": profiles[:, 0], "x1": profiles[:, 1], "L": profiles[:, 2]}
-            )
-            deduplicate_df = deduplicate_df.round(10)
+            # profiles columns: x0, x1, ..., x19, L
+            temp_dict = {"t": tsim}
+            for i in range(20):
+                temp_dict["x{}".format(i)] = profiles[:, i]
+            temp_dict["L"] = profiles[:, 20]
+
+            deduplicate_df = pd.DataFrame(temp_dict)
+            deduplicate_df = deduplicate_df.round(8)
             deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
 
             # Make dataframe from the simulator results
             t = deduplicate_df["t"]
-            x0 = deduplicate_df["x0"]
-            x1 = deduplicate_df["x1"]
+            x = []
+            for j in range(20):
+                x.append(deduplicate_df["x{}".format(j)])
 
+            # Note: at this point, x is a list of 20 pandas series, each series has 11 rows
             # Check duplicates were removed correctly
             assert len(t) == 11
 
             # Update current_x to the next state output by the simulator
             if i < 10:
-                current_x[0] = x0[i+1]
-                current_x[1] = x1[i+1]
+                for j in range(20):
+                    current_x[j] = x[j][i+1]
 
         # Make dataframe from the final simulator results
         t = deduplicate_df["t"]
-        x0 = deduplicate_df["x0"]
-        x1 = deduplicate_df["x1"]
+        x = []
+        for i in range(20):
+            x.append(deduplicate_df["x{}".format(i)])
         L = deduplicate_df["L"]
-        u = u_nn
+        u0 = u0_nn
+        u1 = u1_nn
         inst_cost = []
         ctg = []
 
@@ -516,7 +528,7 @@ class HeatEqSimulator:
             ctg[time] += ctg[time + 1]
 
         # Calculate path violations
-        path = [x1[int(time * 10)] + 0.5 - 8 * (time - 0.5) ** 2 for time in t]
+        path = [x[5][int(time * 10)] - 313 for time in t]
         path_violation = []
         for p in path:
             if max(path) > 0:
@@ -524,10 +536,17 @@ class HeatEqSimulator:
             else:
                 path_violation.append(p)
 
-        nn_sim_results_df = pd.DataFrame(
-            {"t": t, "x0": x0, "x1": x1, "u": u, "L": L,
-             "inst_cost": inst_cost, "ctg": ctg, "path_diff": path_violation}
-        )
+        temp_dict = {"t": t}
+        for i in range(20):
+            temp_dict["x{}".format(i)] = x[i]
+        temp_dict["u0"] = u0
+        temp_dict["u1"] = u1
+        temp_dict["L"] = L
+        temp_dict["inst_cost"] = inst_cost
+        temp_dict["ctg"] = ctg
+        temp_dict["path_diff"] = path_violation
+
+        nn_sim_results_df = pd.DataFrame(temp_dict)
         nn_sim_results_df_dropped_tf = nn_sim_results_df.drop(index=10)
 
         return nn_sim_results_df, nn_sim_results_df_dropped_tf
@@ -574,11 +593,10 @@ class HeatEqSimulator:
         # Save plot with autogenerated filename
         svg_filename = results_folder + "Round {} Run {} Cost {} Constraint {}"\
             .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
-        # plt.savefig(fname=svg_filename, format="svg")
+        plt.savefig(fname=svg_filename, format="svg")
 
-        plt.show()
+        # plt.show()
         plt.close()
-
         return
 
 
@@ -636,15 +654,15 @@ def load_pickle(filename):
     return pickled_nn_model
 
 
-def replay(trajectory_df_filename, buffer_capacity=240):
+def replay(trajectory_df_filename, buffer_capacity=360):
     # Use this to keep track where to push out old data
     forgotten_trajectories_count = 0
-    pickle_filename = "simple_nn_controller_120.pickle"
+    pickle_filename = "heatEq_nn_controller_240.pickle"
     og_trajectory_df_filename = trajectory_df_filename
 
     best_cost_after_n_rounds = {}
 
-    for rp_round in range(90):
+    for rp_round in range(3):
         trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []
@@ -719,7 +737,7 @@ def replay(trajectory_df_filename, buffer_capacity=240):
 
 
 if __name__ == "__main__":
-    generate_trajectories(save_csv=True)
+    # generate_trajectories(save_csv=False)
 
     # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
@@ -727,7 +745,7 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    # replay("simple_120_trajectories_df.csv")
+    replay("heatEq_240_trajectories_df.csv")
 
     # heatEq_system = HeatEqSimulator()
     # print(heatEq_system.mpc_control())
