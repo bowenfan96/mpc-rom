@@ -479,8 +479,8 @@ class HeatEqSimulator:
             # Use pandas to drop the duplicates first
             # profiles columns: x0, x1, ..., x19, L
             temp_dict = {"t": tsim}
-            for i in range(20):
-                temp_dict["x{}".format(i)] = profiles[:, i]
+            for j in range(20):
+                temp_dict["x{}".format(j)] = profiles[:, j]
             temp_dict["L"] = profiles[:, 20]
 
             deduplicate_df = pd.DataFrame(temp_dict)

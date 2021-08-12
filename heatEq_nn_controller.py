@@ -92,7 +92,9 @@ class HeatEqNNController:
         ctg = dataframe["ctg"]
         constraint = dataframe["path_diff"]
 
+        # Tranpose x to obtain a 2D array with shape (num_trajectories * time, 20)
         x = np.array(x).transpose()
+
         u0 = u0.to_numpy(dtype=np.float32).reshape(-1, 1)
         u1 = u1.to_numpy(dtype=np.float32).reshape(-1, 1)
         ctg = ctg.to_numpy(dtype=np.float32).reshape(-1, 1)
@@ -100,6 +102,7 @@ class HeatEqNNController:
 
         u0_and_u1 = np.vstack((u0, u1))
 
+        # x is fit with n rows and 20 columns, so we need to reshape it to this for transform
         self.scaler_x.fit(x)
         self.scaler_u.fit(u0_and_u1)
         self.scaler_ctg.fit(ctg)
@@ -173,16 +176,13 @@ class HeatEqNNController:
         # Process x and u
         # x.shape should be (20, )
         # u.shape should be (2, )
-        x = np.array(x, dtype=np.float32).flatten()
+        # x is fit with n rows and 20 columns, so we need to reshape it to this for transform
+        x = np.array(x, dtype=np.float32).flatten().reshape(-1, 20)
         u = np.array(u, dtype=np.float32).flatten()
 
-        # u must be between [73, 473], so if basinhopper tries an invalid u, we penalize the ctg
-        if not 73 <= u.any() <= 473:
-            return np.inf, np.inf
-
         x_scaled = self.scaler_x.transform(x)
-        u0_scaled = self.scaler_u.transform(u[0])
-        u1_scaled = self.scaler_u.transform(u[1])
+        u0_scaled = self.scaler_u.transform(u[0].reshape(1, -1))
+        u1_scaled = self.scaler_u.transform(u[1].reshape(1, -1))
 
         x_tensor = torch.tensor(x_scaled)
         u0_tensor = torch.tensor(u0_scaled)
@@ -204,7 +204,11 @@ class HeatEqNNController:
         ctg_pred = ctg_pred.item()
         cst_pred = cst_pred.item()
 
-        return ctg_pred, cst_pred
+        # u must be between [73, 473], so if basinhopper tries an invalid u, we penalize the ctg
+        if np.any(u < 73) or np.any(u > 473):
+            return ctg_pred, -1E9
+        else:
+            return ctg_pred, cst_pred
 
     def get_u_opt(self, x, mode="grid"):
         x = np.array(x).flatten()
@@ -213,12 +217,17 @@ class HeatEqNNController:
             best_u = [273, 273]
             best_ctg = np.inf
 
-            for u0 in np.linspace(start=73, stop=473, num=200):
-                for u1 in np.linspace(start=73, stop=473, num=200):
+            for u0 in np.linspace(start=73, stop=473, num=80):
+                for u1 in np.linspace(start=73, stop=473, num=80):
                     ctg_pred, cst_pred = self.predict_ctg_cst(x, [u0, u1])
+
+                    # print(ctg_pred, cst_pred)
+
                     if ctg_pred < best_ctg and cst_pred <= 0:
                         best_u = [u0, u1]
                         best_ctg = ctg_pred
+                    # else:
+                    #     print("DID NOT TRIGGER")
 
             best_u = np.array(best_u).flatten()
             # Add some noise to encourage exploration
@@ -235,29 +244,40 @@ class HeatEqNNController:
                 x_bh = arg_x_bh[0]
                 x_bh = np.array(x_bh).flatten()
                 ctg_pred_bh, cst_pred_bh = self.predict_ctg_cst(x_bh, u_bh)
-                # If constraints are broken, then we apply a 5x penalty to the cost to go
+                # If constraints are broken, then we apply a 10x penalty to the cost to go
                 # The greater the penalty, the more we drive a wedge between local minima for the gradient descent
                 if cst_pred_bh > 0:
-                    ctg_pred_bh = ctg_pred_bh * 5
+                    ctg_pred_bh = ctg_pred_bh * 10
                 return ctg_pred_bh
 
             # Configure options for the gradient descent optimizer
             gd_options = {}
             # gd_options["maxiter"] = 1000
-            gd_options["disp"] = True
+            # gd_options["disp"] = True
             # gd_options["eps"] = 1
+
+            # Specify bounds to send to the minimizer (cannot use with nelder-mead)
+            # bounds = optimize.Bounds([73, 473], [73, 473])
 
             # Nelder-mead is chosen because it is a gradientless method
             min_kwargs = {
                 "args": x,
                 "method": 'nelder-mead',
                 "options": gd_options
+                # "bounds": bounds
             }
             result = optimize.basinhopping(
                 func=basinhopper_helper, x0=[273, 273], minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
+            # Add some noise to encourage exploration
+            u0_opt_with_noise = u_opt[0] + np.random.randint(low=-2, high=2, size=None)
+            u1_opt_with_noise = u_opt[1] + np.random.randint(low=-2, high=2, size=None)
+            best_u_with_noise = np.array((u0_opt_with_noise, u1_opt_with_noise)).flatten()
+            print("Best u given x = {} is {}, adding noise = {}"
+                  .format(x.flatten().round(4), u_opt.round(4), best_u_with_noise.round(4))
+                  )
             return u_opt
 
 
