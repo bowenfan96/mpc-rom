@@ -69,10 +69,8 @@ class HeatEqSimulator:
         self.model.x = Var(self.model.x_idx, self.model.time)
         self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time)
 
-        # Control variables u as vector
-        self.model.u_idx = RangeSet(0, self.B.shape[1]-1)
-        # TODO Decide controller bounds
-        self.model.u = Var(self.model.u_idx, self.model.time, bounds=(73, 473))
+        self.model.u0 = Var(self.model.time, bounds=(73, 473))
+        self.model.u1 = Var(self.model.time, bounds=(73, 473))
 
         # Initial state: the rod is 273 Kelvins throughout
         # Change this array if random initial states are desired
@@ -91,7 +89,8 @@ class HeatEqSimulator:
         discretizer.apply_to(self.model, nfe=10, ncp=4, scheme="LAGRANGE-RADAU")
 
         # Make controls piecewise linear
-        discretizer.reduce_collocation_points(self.model, var=self.model.u, ncp=1, contset=self.model.time)
+        discretizer.reduce_collocation_points(self.model, var=self.model.u0, ncp=1, contset=self.model.time)
+        discretizer.reduce_collocation_points(self.model, var=self.model.u1, ncp=1, contset=self.model.time)
 
         # ODEs
         # Set up vector of ODEs
@@ -101,7 +100,12 @@ class HeatEqSimulator:
             return sum((m.x[j, _t] * self.A[_i][j]) for j in range(self.A.shape[1]))
 
         def _ode_Bu(m, _i, _t):
-            return sum((m.u[j, _t] * self.B[_i][j]) for j in range(self.B.shape[1]))
+            if _i == 0:
+                return c * m.u0[_t]
+            elif _i == 19:
+                return c * m.u1[_t]
+            else:
+                return 0
 
         for t in self.model.time:
             for i in range(N):
@@ -127,7 +131,7 @@ class HeatEqSimulator:
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
                    == setpoint_weight * ((m.x[5, _t] - 303) ** 2 + (m.x[12, _t] - 333) ** 2) \
-                   + controller_weight * ((m.u[0, _t] - 273) ** 2 + (m.u[1, _t] - 273) ** 2)
+                   + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
                    # + controller_weight * ((m.u[0, _t] - m.x[0, _t]) ** 2 + (m.u[1, _t] - m.x[19, _t]) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
@@ -155,7 +159,8 @@ class HeatEqSimulator:
         t = []
         # x and u are lists of lists
         x = []
-        u = []
+        u0 = []
+        u1 = []
         L = []
         inst_cost = []
         ctg = []
@@ -165,12 +170,8 @@ class HeatEqSimulator:
         for time in self.model.time:
             if time in timesteps:
                 t.append(time)
-
-                temp_u = []
-                for u_idx in range(self.B.shape[1]):
-                    temp_u.append(value(self.model.u[u_idx, time]))
-                u.append(temp_u)
-
+                u0.append(value(self.model.u0[time]))
+                u1.append(value(self.model.u1[time]))
                 L.append(value(self.model.L[time]))
 
                 temp_x = []
@@ -196,13 +197,12 @@ class HeatEqSimulator:
             ctg[time] += ctg[time + 1]
 
         x = np.array(x)
-        u = np.array(u)
 
         df_data = {"t": t}
         for x_idx in range(self.A.shape[0]):
             df_data["x{}".format(x_idx)] = x[:, x_idx]
-        for u_idx in range(self.B.shape[1]):
-            df_data["u{}".format(u_idx)] = u[:, u_idx]
+        df_data["u0"] = u0
+        df_data["u1"] = u1
         df_data["L"] = L
         df_data["inst_cost"] = inst_cost
         df_data["ctg"] = ctg
@@ -216,16 +216,23 @@ class HeatEqSimulator:
 
     def simulate_system_rng_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
-        u_rng = np.random.uniform(low=73, high=473, size=11)
+        u0_rng = np.random.uniform(low=73, high=473, size=11)
+        u1_rng = np.random.uniform(low=73, high=473, size=11)
 
         # Create a dictionary of piecewise linear controller actions
-        u_rng_profile = {timesteps[i]: u_rng[i] for i in range(len(timesteps))}
+        u0_rng_profile = {timesteps[i]: u0_rng[i] for i in range(len(timesteps))}
+        u1_rng_profile = {timesteps[i]: u1_rng[i] for i in range(len(timesteps))}
 
         self.model.var_input = Suffix(direction=Suffix.LOCAL)
-        self.model.var_input[self.model.u] = u_rng_profile
+        self.model.var_input[self.model.u0] = u0_rng_profile
+        self.model.var_input[self.model.u1] = u1_rng_profile
 
         sim = Simulator(self.model, package="casadi")
         tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
+
+        print(profiles)
+
+        return
 
         # For some reason both tsim and profiles contain duplicates
         # Use pandas to drop the duplicates first
@@ -241,7 +248,8 @@ class HeatEqSimulator:
         x0 = deduplicate_df["x0"]
         x1 = deduplicate_df["x1"]
         L = deduplicate_df["L"]
-        u = u_rng
+        u0 = u0_rng
+        u1 = u1_rng
         inst_cost = []
         ctg = []
 
@@ -272,7 +280,7 @@ class HeatEqSimulator:
                 path_violation.append(p)
 
         rng_sim_results_df = pd.DataFrame(
-            {"t": t, "x0": x0, "x1": x1, "u": u, "L": L,
+            {"t": t, "x0": x0, "x1": x1, "u0": u0, "u1": u1, "L": L,
              "inst_cost": inst_cost, "ctg": ctg, "path_diff": path_violation}
         )
         rng_sim_results_df_dropped_tf = rng_sim_results_df.drop(index=10)
@@ -378,11 +386,11 @@ class HeatEqSimulator:
         u0 = dataframe["u0"]
         u1 = dataframe["u1"]
 
-        # cst = dataframe["path_diff"]
-        # if cst.max() <= 0:
-        #     cst_status = "Pass"
-        # else:
-        #     cst_status = "Fail"
+        cst = dataframe["path_diff"]
+        if cst.max() <= 0:
+            cst_status = "Pass"
+        else:
+            cst_status = "Fail"
 
         # Check that the cost to go is equal to the Lagrangian cost integral
         assert np.isclose(ctg.iloc[0], dataframe["L"].iloc[-1], atol=0.01)
@@ -392,24 +400,24 @@ class HeatEqSimulator:
         fig.set_size_inches(5, 10)
 
         axs[0].plot(t, x5, label="$x_5$")
+        axs[0].plot(t, np.full(shape=(t.size, ), fill_value=313), label="Constraint for $x_5$")
         axs[0].legend()
 
         axs[1].plot(t, x12, label="$x_{12}$")
-        # axs[1].plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label="Path constraint for $x_1$")
         axs[1].legend()
 
-        axs[2].step(t, u0, label="u_0")
-        axs[2].step(t, u1, label="u_1")
+        axs[2].step(t, u0, label="$u_0$")
+        axs[2].step(t, u1, label="$u_1$")
         axs[2].legend()
 
         fig.suptitle("Control policy and system state after {} rounds of training \n "
-                     "Run {}: Cost = {}"
-                     .format(num_rounds, num_run_in_round, total_cost))
+                     "Run {}: Cost = {}, Constraint = {}"
+                     .format(num_rounds, num_run_in_round, total_cost, cst_status))
         plt.xlabel("Time")
 
         # Save plot with autogenerated filename
-        svg_filename = results_folder + "Round {} Run {} Cost {}"\
-            .format(num_rounds, num_run_in_round, total_cost) + ".svg"
+        svg_filename = results_folder + "Round {} Run {} Cost {} Constraint {}"\
+            .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
         # plt.savefig(fname=svg_filename, format="svg")
 
         plt.show()
@@ -419,10 +427,10 @@ class HeatEqSimulator:
 
 
 def generate_trajectories(save_csv=False):
-    df_cols = ["t", "x0", "x1", "u", "L", "inst_cost", "ctg", "path_diff"]
-    # 40 trajectories which obeyed the path constraint
+    df_cols = ["t", "x5", "x12", "u", "L", "inst_cost", "ctg", "path_diff"]
+    # 80 trajectories which obeyed the path constraint
     obey_path_df = pd.DataFrame(columns=df_cols)
-    # 20 trajectories which violated the path constraint
+    # 40 trajectories which violated the path constraint
     violate_path_df = pd.DataFrame(columns=df_cols)
     simple_60_trajectories_df = pd.DataFrame(columns=df_cols)
 
@@ -433,8 +441,8 @@ def generate_trajectories(save_csv=False):
     while num_samples < 120:
 
         while num_good < 2:
-            simple_sys = HeatEqSimulator()
-            _, trajectory = simple_sys.simulate_system_rng_controls()
+            heatEq_sys = HeatEqSimulator()
+            _, trajectory = heatEq_sys.simulate_system_rng_controls()
             if trajectory["path_diff"].max() <= 0:
                 simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
                 obey_path_df = pd.concat([obey_path_df, trajectory])
@@ -442,8 +450,8 @@ def generate_trajectories(save_csv=False):
                 num_samples += 1
 
         while num_bad < 1:
-            simple_sys = HeatEqSimulator()
-            _, trajectory = simple_sys.simulate_system_rng_controls()
+            heatEq_sys = HeatEqSimulator()
+            _, trajectory = heatEq_sys.simulate_system_rng_controls()
             if trajectory["path_diff"].max() > 0:
                 simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
                 violate_path_df = pd.concat([violate_path_df, trajectory])
@@ -456,9 +464,10 @@ def generate_trajectories(save_csv=False):
 
         print("Samples: ", num_samples)
 
-    simple_60_trajectories_df.to_csv("simple_120_trajectories_df.csv")
-    obey_path_df.to_csv("obey_path_df.csv")
-    violate_path_df.to_csv("violate_path_df.csv")
+    if save_csv:
+        simple_60_trajectories_df.to_csv("simple_120_trajectories_df.csv")
+        obey_path_df.to_csv("obey_path_df.csv")
+        violate_path_df.to_csv("violate_path_df.csv")
 
 
 def load_pickle(filename):
@@ -551,7 +560,7 @@ def replay(trajectory_df_filename, buffer_capacity=240):
 
 
 if __name__ == "__main__":
-    # generate_trajectories(save_csv=True)
+    generate_trajectories(save_csv=False)
 
     # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
@@ -561,7 +570,7 @@ if __name__ == "__main__":
 
     # replay("simple_120_trajectories_df.csv")
 
-    heatEq_system = HeatEqSimulator()
-    print(heatEq_system.mpc_control())
-    main_res, _ = heatEq_system.parse_mpc_results()
-    heatEq_system.plot(main_res)
+    # heatEq_system = HeatEqSimulator()
+    # print(heatEq_system.mpc_control())
+    # main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system.plot(main_res)
