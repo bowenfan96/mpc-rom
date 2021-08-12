@@ -12,7 +12,7 @@ from pyomo.solvers import *
 
 from simple_nn_controller import *
 
-results_folder = "simple_replay_results/120traj2/"
+results_folder = "simple_replay_results/ray11-2/"
 
 
 class SimpleSimulator:
@@ -387,7 +387,7 @@ def replay(trajectory_df_filename, buffer_capacity=240):
 
     best_cost_after_n_rounds = {}
 
-    for rp_round in range(90):
+    for rp_round in range(150):
         trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []

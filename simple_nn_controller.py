@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "simple_replay_results/120traj2/"
+results_folder = "simple_replay_results/ray11-2/"
 
 
 class Net(nn.Module):
@@ -182,7 +182,7 @@ class SimpleNNController:
                     best_ctg = ctg_pred
 
             # Add some noise to encourage exploration
-            best_u_with_noise = best_u + np.random.uniform(low=-2, high=2, size=None)
+            best_u_with_noise = best_u + np.random.uniform(low=-0.2, high=0.2, size=None)
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), round(best_u, 4), round(best_u_with_noise, 4))
                   )
