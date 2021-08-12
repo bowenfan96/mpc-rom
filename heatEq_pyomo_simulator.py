@@ -16,71 +16,76 @@ results_folder = "heatEq_replay_results/"
 
 
 class HeatEqSimulator:
-    def __init__(self, duration=1, x0_init=0, x1_init=-1, num_dp=20):
+    def __init__(self, duration=1, N=20):
         # Unique ID for savings csv and plots, based on model timestamp
         self.uid = datetime.datetime.now().strftime("%d-%H.%M.%S.%f")[:-3]
         print("Model uid", self.uid)
 
-        # ----- GENERATE THE MODEL -----
+        # ----- GENERATE THE MODEL MATRICES -----
         # Apply the method of lines on the heat equation to generate the A matrix
-        # Length of the rod = 1 m, number of segments = number of discretization points + 1
+        # Length of the rod = 1 m
+        # Number of segments = number of discretization points - 1 (as 2 ends take up 2 points)
         length = 1
-        num_segments = num_dp + 1
+        num_segments = N - 1
         # Thermal diffusivity alpha
-        alpha = 0.01
+        alpha = 0.1
         segment_length = length / num_segments
         # Constant
         c = alpha / (segment_length ** 2)
 
+        # Generate A matrix
+        A_mat = np.zeros(shape=(N, N))
+        for row in range(A_mat.shape[0]):
+            for col in range(A_mat.shape[1]):
+                if row == col:
+                    A_mat[row][col] = -2
+                elif abs(row - col) == 1:
+                    A_mat[row][col] = 1
+                else:
+                    A_mat[row][col] = 0
+        # Multiply constant to all elements in A
+        self.A = c * A_mat
 
+        # Generate B matrix
+        # Two sources of heat at each end of the rod
+        num_heaters = 2
+        B_mat = np.zeros(shape=(N, num_heaters))
+        # First heater on the left
+        B_mat[0][0] = 1
+        # Second heater on the right
+        B_mat[N - 1][num_heaters - 1] = 1
+        # Multiply constant to all elements in B
+        self.B = c * B_mat
 
         # ----- SET UP THE BASIC MODEL -----
         # Set up pyomo model structure
         self.model = ConcreteModel()
         self.model.time = ContinuousSet(bounds=(0, duration))
 
-        # State variables
-        self.model.x0 = Var(self.model.time)
-        self.model.x1 = Var(self.model.time)
-        self.model.x0_dot = DerivativeVar(self.model.x0, wrt=self.model.time)
-        self.model.x1_dot = DerivativeVar(self.model.x1, wrt=self.model.time)
-        # Initial state
-        self.model.x0[0].fix(x0_init)
-        self.model.x1[0].fix(x1_init)
+        # State variables x as a vector
+        # Pyomo RangeSet includes both first and last
+        # Pyomo defaults sets to 1-indexing so we force 0-indexing
+        self.model.x_idx = RangeSet(0, self.A.shape[1]-1)
+        self.model.x = Var(self.model.x_idx, self.model.time)
+        self.model.x_dot = DerivativeVar(self.model.x, wrt=self.model.time)
 
-        # Controls
-        self.model.u = Var(self.model.time, bounds=(-20, 20))
+        # Control variables u as vector
+        self.model.u_idx = RangeSet(0, self.B.shape[1]-1)
+        # TODO Decide controller bounds
+        self.model.u = Var(self.model.u_idx, self.model.time, bounds=(73, 473))
+
+        # Initial state: the rod is 273 Kelvins throughout
+        # Change this array if random initial states are desired
+        x_init = np.full(shape=(N, ), fill_value=273)
+        # x_init = np.random.randint(low=263, high=283, size=N)
 
         # Lagrangian cost
         self.model.L = Var(self.model.time)
         self.model.L_dot = DerivativeVar(self.model.L, wrt=self.model.time)
         self.model.L[0].fix(0)
 
-        # ODEs
-        def _ode_x0(m, t):
-            return m.x0_dot[t] == m.x1[t]
-        self.model.ode_x0 = Constraint(self.model.time, rule=_ode_x0)
-
-        def _ode_x1(m, t):
-            return m.x1_dot[t] == -m.x1[t] + m.u[t]
-        self.model.ode_x1 = Constraint(self.model.time, rule=_ode_x1)
-
-        # Path constraint for x1
-        def _path_constraint_x1(m, t):
-            return m.x1[t] + 0.5 - 8 * (t - 0.5) ** 2 <= 0
-        self.model.constraint_x1 = Constraint(self.model.time, rule=_path_constraint_x1)
-
-        # Lagrangian cost
-        def _Lagrangian(m, t):
-            return m.L_dot[t] == (m.x0[t] ** 2) + (m.x1[t] ** 2) + (5E-3 * m.u[t] ** 2)
-        self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
-
-        # Objective function is to minimize the Lagrangian cost integral
-        def _objective(m):
-            return m.L[m.time.last()] - m.L[0]
-        self.model.objective = Objective(rule=_objective, sense=minimize)
-
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
+        # We need to discretize before adding ODEs in matrix form
         # We fix finite elements at 10, collocation points at 4, controls to be piecewise linear
         discretizer = TransformationFactory("dae.collocation")
         discretizer.apply_to(self.model, nfe=10, ncp=4, scheme="LAGRANGE-RADAU")
@@ -88,20 +93,68 @@ class HeatEqSimulator:
         # Make controls piecewise linear
         discretizer.reduce_collocation_points(self.model, var=self.model.u, ncp=1, contset=self.model.time)
 
+        # ODEs
+        # Set up vector of ODEs
+        self.model.ode = ConstraintList()
+
+        def _ode_Ax(m, _i, _t):
+            return sum((m.x[j, _t] * self.A[_i][j]) for j in range(self.A.shape[1]))
+
+        def _ode_Bu(m, _i, _t):
+            return sum((m.u[j, _t] * self.B[_i][j]) for j in range(self.B.shape[1]))
+
+        for t in self.model.time:
+            for i in range(N):
+                self.model.ode.add(
+                    self.model.x_dot[i, t] == _ode_Ax(self.model, i, t) + _ode_Bu(self.model, i, t)
+                )
+                # Fix variables based on initial values
+                self.model.x[i, 0].fix(x_init[i])
+
+        # ----- OBJECTIVE AND COST FUNCTION -----
+        # Objective:
+        # We want to heat element 6 (x[5]) at the 1/3 position to 30 C, 303 K
+        # And element 13 (x[12]) at the 2/3 position to 60 C, 333 K
+        # We would like to minimize the controller costs too, in terms of how much heating or cooling is applied
+        # This is represented by the difference between controller temperature and the temperature of the element
+        # to which heat is applied - x[0] for u[0] and x[19] for u[1]
+
+        # Define weights for setpoint and controller objectives
+        setpoint_weight = 0.995
+        controller_weight = 1 - setpoint_weight
+
+        # Lagrangian cost
+        def _Lagrangian(m, _t):
+            return m.L_dot[_t] \
+                   == setpoint_weight * ((m.x[5, _t] - 303) ** 2 + (m.x[12, _t] - 333) ** 2) \
+                   + controller_weight * ((m.u[0, _t] - 273) ** 2 + (m.u[1, _t] - 273) ** 2)
+                   # + controller_weight * ((m.u[0, _t] - m.x[0, _t]) ** 2 + (m.u[1, _t] - m.x[19, _t]) ** 2)
+        self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
+
+        # Objective function is to minimize the Lagrangian cost integral
+        def _objective(m):
+            return m.L[m.time.last()] - m.L[0]
+        self.model.objective = Objective(rule=_objective, sense=minimize)
+
+        # Constraint for the element at the 1/3 position: temperature must not exceed 313 K (10 K above setpoint)
+        def _constraint_x5(m, _t):
+            return m.x[5, _t] <= 313
+        self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
+
         return
 
     def mpc_control(self):
-        mpc_solver = SolverFactory("ipopt")
+        mpc_solver = SolverFactory("ipopt", tee=True)
         mpc_results = mpc_solver.solve(self.model)
 
         return mpc_results
 
     def parse_mpc_results(self):
-        # Each t, X0, X1, U, L, instantaneous cost, cost to go, should be a column
+        # Each t, x0, x1, x2, etc, U, L, instantaneous cost, cost to go, should be a column
         # Label them and return a pandas dataframe
         t = []
-        x0 = []
-        x1 = []
+        # x and u are lists of lists
+        x = []
         u = []
         L = []
         inst_cost = []
@@ -112,10 +165,18 @@ class HeatEqSimulator:
         for time in self.model.time:
             if time in timesteps:
                 t.append(time)
-                x0.append(value(self.model.x0[time]))
-                x1.append(value(self.model.x1[time]))
-                u.append(value(self.model.u[time]))
+
+                temp_u = []
+                for u_idx in range(self.B.shape[1]):
+                    temp_u.append(value(self.model.u[u_idx, time]))
+                u.append(temp_u)
+
                 L.append(value(self.model.L[time]))
+
+                temp_x = []
+                for x_idx in range(self.A.shape[0]):
+                    temp_x.append(value(self.model.x[x_idx, time]))
+                x.append(temp_x)
 
         # Make sure all 11 time steps are recorded; this was problematic due to Pyomo's float indexing
         assert len(t) == 11
@@ -134,16 +195,28 @@ class HeatEqSimulator:
         for time in reversed(range(len(t) - 1)):
             ctg[time] += ctg[time + 1]
 
-        mpc_results_df = pd.DataFrame(
-            {"t": t, "x0": x0, "x1": x1, "u": u, "L": L, "inst_cost": inst_cost, "ctg": ctg}
-        )
+        x = np.array(x)
+        u = np.array(u)
+
+        df_data = {"t": t}
+        for x_idx in range(self.A.shape[0]):
+            df_data["x{}".format(x_idx)] = x[:, x_idx]
+        for u_idx in range(self.B.shape[1]):
+            df_data["u{}".format(u_idx)] = u[:, u_idx]
+        df_data["L"] = L
+        df_data["inst_cost"] = inst_cost
+        df_data["ctg"] = ctg
+
+        mpc_results_df = pd.DataFrame(df_data)
         mpc_results_df_dropped_t0 = mpc_results_df.drop(index=0)
+
+        print(mpc_results_df)
 
         return mpc_results_df, mpc_results_df_dropped_t0
 
     def simulate_system_rng_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
-        u_rng = np.random.uniform(low=-20, high=20, size=11)
+        u_rng = np.random.uniform(low=73, high=473, size=11)
 
         # Create a dictionary of piecewise linear controller actions
         u_rng_profile = {timesteps[i]: u_rng[i] for i in range(len(timesteps))}
@@ -295,48 +368,51 @@ class HeatEqSimulator:
 
         return nn_sim_results_df, nn_sim_results_df_dropped_tf
 
-    @staticmethod
-    def plot(dataframe, num_rounds=0, num_run_in_round=0):
+    def plot(self, dataframe, num_rounds=0, num_run_in_round=0):
         t = dataframe["t"]
-        x0 = dataframe["x0"]
-        x1 = dataframe["x1"]
-        u = dataframe["u"]
         ctg = dataframe["ctg"]
-        cst = dataframe["path_diff"]
 
-        if cst.max() <= 0:
-            cst_status = "Pass"
-        else:
-            cst_status = "Fail"
+        # Plot x[5] and x[12], the elements whose temperatures we are trying to control
+        x5 = dataframe["x5"]
+        x12 = dataframe["x12"]
+        u0 = dataframe["u0"]
+        u1 = dataframe["u1"]
+
+        # cst = dataframe["path_diff"]
+        # if cst.max() <= 0:
+        #     cst_status = "Pass"
+        # else:
+        #     cst_status = "Fail"
 
         # Check that the cost to go is equal to the Lagrangian cost integral
-        # assert np.isclose(ctg[0], dataframe["L"].iloc[-1], atol=0.01)
-        total_cost = round(ctg[0], 3)
+        assert np.isclose(ctg.iloc[0], dataframe["L"].iloc[-1], atol=0.01)
+        total_cost = round(ctg.iloc[0], 3)
 
         fig, axs = plt.subplots(3, constrained_layout=True)
         fig.set_size_inches(5, 10)
 
-        axs[0].plot(t, x0, label="$x_0$")
+        axs[0].plot(t, x5, label="$x_5$")
         axs[0].legend()
 
-        axs[1].plot(t, x1, label="$x_1$")
-        axs[1].plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label="Path constraint for $x_1$")
+        axs[1].plot(t, x12, label="$x_{12}$")
+        # axs[1].plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label="Path constraint for $x_1$")
         axs[1].legend()
 
-        axs[2].step(t, u, label="Neural net controller action, u")
+        axs[2].step(t, u0, label="u_0")
+        axs[2].step(t, u1, label="u_1")
         axs[2].legend()
 
         fig.suptitle("Control policy and system state after {} rounds of training \n "
-                     "Run {}: Cost = {}, Constraint = {}"
-                     .format(num_rounds, num_run_in_round, total_cost, cst_status))
+                     "Run {}: Cost = {}"
+                     .format(num_rounds, num_run_in_round, total_cost))
         plt.xlabel("Time")
 
         # Save plot with autogenerated filename
-        svg_filename = results_folder + "Round {} Run {} Cost {} Constraint {}"\
-            .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
-        plt.savefig(fname=svg_filename, format="svg")
+        svg_filename = results_folder + "Round {} Run {} Cost {}"\
+            .format(num_rounds, num_run_in_round, total_cost) + ".svg"
+        # plt.savefig(fname=svg_filename, format="svg")
 
-        # plt.show()
+        plt.show()
         plt.close()
 
         return
@@ -483,4 +559,9 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    replay("simple_120_trajectories_df.csv")
+    # replay("simple_120_trajectories_df.csv")
+
+    heatEq_system = HeatEqSimulator()
+    print(heatEq_system.mpc_control())
+    main_res, _ = heatEq_system.parse_mpc_results()
+    heatEq_system.plot(main_res)
