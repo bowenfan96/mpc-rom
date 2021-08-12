@@ -388,7 +388,7 @@ class HeatEqSimulator:
         temp_dict["L"] = profiles[:, 20]
 
         deduplicate_df = pd.DataFrame(temp_dict)
-        deduplicate_df = deduplicate_df.round(5)
+        deduplicate_df = deduplicate_df.round(8)
         deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
 
         # Make dataframe from the simulator results
@@ -597,7 +597,7 @@ def generate_trajectories(save_csv=False):
     num_good = 0
     num_bad = 0
 
-    while num_samples < 15:
+    while num_samples < 120:
 
         while num_good < 2:
             heatEq_sys = HeatEqSimulator()
