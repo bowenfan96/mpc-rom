@@ -204,8 +204,8 @@ class HeatEqNNController:
         ctg_pred = ctg_pred.item()
         cst_pred = cst_pred.item()
 
-        # u must be between [73, 473], so if basinhopper tries an invalid u, we penalize the ctg
-        if np.any(u < 73) or np.any(u > 473):
+        # u must be between [173, 373], so if basinhopper tries an invalid u, we penalize the ctg
+        if np.any(u < 173) or np.any(u > 373):
             return ctg_pred, -1E9
         else:
             return ctg_pred, cst_pred
@@ -217,8 +217,8 @@ class HeatEqNNController:
             best_u = [273, 273]
             best_ctg = np.inf
 
-            for u0 in np.linspace(start=73, stop=473, num=80):
-                for u1 in np.linspace(start=73, stop=473, num=80):
+            for u0 in np.linspace(start=173, stop=373, num=40):
+                for u1 in np.linspace(start=173, stop=373, num=40):
                     ctg_pred, cst_pred = self.predict_ctg_cst(x, [u0, u1])
 
                     # print(ctg_pred, cst_pred)
@@ -257,7 +257,7 @@ class HeatEqNNController:
             # gd_options["eps"] = 1
 
             # Specify bounds to send to the minimizer (cannot use with nelder-mead)
-            # bounds = optimize.Bounds([73, 473], [73, 473])
+            # bounds = optimize.Bounds([173, 373], [173, 373])
 
             # Nelder-mead is chosen because it is a gradientless method
             min_kwargs = {

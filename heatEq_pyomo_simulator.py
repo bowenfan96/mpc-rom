@@ -28,7 +28,7 @@ class HeatEqSimulator:
         length = 1
         num_segments = N - 1
         # Thermal diffusivity alpha
-        alpha = 0.1
+        alpha = 0.2
         segment_length = length / num_segments
         # Constant
         c = alpha / (segment_length ** 2)
@@ -136,8 +136,8 @@ class HeatEqSimulator:
         self.model.x19[0].fix(x_init[19])
 
         # Set up controls
-        self.model.u0 = Var(self.model.time, bounds=(73, 473))
-        self.model.u1 = Var(self.model.time, bounds=(73, 473))
+        self.model.u0 = Var(self.model.time, bounds=(173, 373))
+        self.model.u1 = Var(self.model.time, bounds=(173, 373))
 
         # ODEs
         # Set up x0_dot = Ax + Bu
@@ -362,8 +362,8 @@ class HeatEqSimulator:
 
     def simulate_system_rng_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
-        u0_rng = np.random.uniform(low=73, high=473, size=11)
-        u1_rng = np.random.uniform(low=73, high=473, size=11)
+        u0_rng = np.random.uniform(low=173, high=373, size=11)
+        u1_rng = np.random.uniform(low=173, high=373, size=11)
 
         # Create a dictionary of piecewise linear controller actions
         u0_rng_profile = {timesteps[i]: u0_rng[i] for i in range(len(timesteps))}
@@ -561,11 +561,14 @@ class HeatEqSimulator:
         u0 = dataframe["u0"]
         u1 = dataframe["u1"]
 
-        cst = dataframe["path_diff"]
-        if cst.max() <= 0:
-            cst_status = "Pass"
+        if "path_diff" in dataframe.columns:
+            cst = dataframe["path_diff"]
+            if cst.max() <= 0:
+                cst_status = "Pass"
+            else:
+                cst_status = "Fail"
         else:
-            cst_status = "Fail"
+            cst_status = "None"
 
         # Check that the cost to go is equal to the Lagrangian cost integral
         assert np.isclose(ctg.iloc[0], dataframe["L"].iloc[-1], atol=0.01)
@@ -595,7 +598,7 @@ class HeatEqSimulator:
             .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
         plt.savefig(fname=svg_filename, format="svg")
 
-        # plt.show()
+        plt.show()
         plt.close()
         return
 
@@ -737,7 +740,7 @@ def replay(trajectory_df_filename, buffer_capacity=360):
 
 
 if __name__ == "__main__":
-    # generate_trajectories(save_csv=False)
+    generate_trajectories(save_csv=True)
 
     # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
@@ -745,7 +748,7 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    replay("heatEq_240_trajectories_df.csv")
+    # replay("heatEq_240_trajectories_df.csv")
 
     # heatEq_system = HeatEqSimulator()
     # print(heatEq_system.mpc_control())
