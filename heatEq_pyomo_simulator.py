@@ -587,9 +587,9 @@ def generate_trajectories(save_csv=False):
     for i in range(20):
         df_cols.append("x{}".format(i))
     df_cols.extend(["u0", "u1", "L", "inst_cost", "ctg", "path_diff"])
-    # 80 trajectories which obeyed the path constraint
+    # 180 trajectories which obeyed the path constraint
     obey_path_df = pd.DataFrame(columns=df_cols)
-    # 40 trajectories which violated the path constraint
+    # 60 trajectories which violated the path constraint
     violate_path_df = pd.DataFrame(columns=df_cols)
     simple_60_trajectories_df = pd.DataFrame(columns=df_cols)
 
@@ -597,9 +597,9 @@ def generate_trajectories(save_csv=False):
     num_good = 0
     num_bad = 0
 
-    while num_samples < 120:
+    while num_samples < 240:
 
-        while num_good < 2:
+        while num_good < 3:
             heatEq_sys = HeatEqSimulator()
             _, trajectory = heatEq_sys.simulate_system_rng_controls()
             if trajectory["path_diff"].max() <= 0:
@@ -624,7 +624,7 @@ def generate_trajectories(save_csv=False):
         print("Samples: ", num_samples)
 
     if save_csv:
-        simple_60_trajectories_df.to_csv("heatEq_120_trajectories_df.csv")
+        simple_60_trajectories_df.to_csv("heatEq_240_trajectories_df.csv")
         obey_path_df.to_csv("heatEq_obey_path_df.csv")
         violate_path_df.to_csv("heatEq_violate_path_df.csv")
 
