@@ -12,7 +12,7 @@ from pyomo.solvers import *
 
 from heatEq_nn_controller import *
 
-results_folder = "heatEq_replay_results/"
+results_folder = "heatEq_replay_results/hp/"
 
 
 class HeatEqSimulator:
@@ -28,7 +28,7 @@ class HeatEqSimulator:
         length = 1
         num_segments = N - 1
         # Thermal diffusivity alpha
-        alpha = 0.2
+        alpha = 0.3
         segment_length = length / num_segments
         # Constant
         c = alpha / (segment_length ** 2)
@@ -388,7 +388,7 @@ class HeatEqSimulator:
         temp_dict["L"] = profiles[:, 20]
 
         deduplicate_df = pd.DataFrame(temp_dict)
-        deduplicate_df = deduplicate_df.round(8)
+        deduplicate_df = deduplicate_df.round(5)
         deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
 
         # Make dataframe from the simulator results
@@ -598,7 +598,7 @@ class HeatEqSimulator:
             .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
         plt.savefig(fname=svg_filename, format="svg")
 
-        plt.show()
+        # plt.show()
         plt.close()
         return
 
@@ -665,7 +665,7 @@ def replay(trajectory_df_filename, buffer_capacity=360):
 
     best_cost_after_n_rounds = {}
 
-    for rp_round in range(3):
+    for rp_round in range(90):
         trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []
@@ -740,7 +740,7 @@ def replay(trajectory_df_filename, buffer_capacity=360):
 
 
 if __name__ == "__main__":
-    generate_trajectories(save_csv=True)
+    # generate_trajectories(save_csv=True)
 
     # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
@@ -748,7 +748,7 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    # replay("heatEq_240_trajectories_df.csv")
+    replay("heatEq_240_trajectories_df.csv")
 
     # heatEq_system = HeatEqSimulator()
     # print(heatEq_system.mpc_control())

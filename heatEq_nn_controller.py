@@ -18,7 +18,7 @@ from scipy import optimize
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "heatEq_replay_results/"
+results_folder = "heatEq_replay_results/hp/"
 
 
 class xMOR(nn.Module):
