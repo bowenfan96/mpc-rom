@@ -122,6 +122,7 @@ class SimpleNNController:
                 cst_optimizer.step()
 
             # Test on the whole dataset at this epoch
+            self.net.eval()
             with torch.no_grad():
                 ctg_pred, cst_pred = self.net(x, u)
 
@@ -129,6 +130,7 @@ class SimpleNNController:
                 loss_cst = cst_criterion(cst_pred, cst)
 
                 print("Epoch {}: loss_ctg = {} and loss_cst = {}".format(epoch, loss_ctg, loss_cst))
+            self.net.train()
 
     def predict_ctg_cst(self, x, u):
         # Process x
@@ -151,6 +153,7 @@ class SimpleNNController:
         u_tensor = torch.tensor(u_scaled)
         x_tensor = torch.hstack((x0_tensor, x1_tensor))
 
+        self.net.eval()
         with torch.no_grad():
             ctg_pred, cst_pred = self.net(x_tensor, u_tensor)
 
