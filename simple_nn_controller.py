@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "simple_replay_results/120traj/"
+results_folder = "simple_replay_results/120traj2/"
 
 
 class Net(nn.Module):
@@ -106,7 +106,7 @@ class SimpleNNController:
         ctg_criterion = nn.MSELoss()
         cst_criterion = nn.MSELoss()
 
-        for epoch in range(500):
+        for epoch in range(300):
             for x_mb, u_mb, ctg_mb, cst_mb in mb_loader:
                 ctg_optimizer.zero_grad()
                 cst_optimizer.zero_grad()
@@ -179,7 +179,7 @@ class SimpleNNController:
                     best_ctg = ctg_pred
 
             # Add some noise to encourage exploration
-            best_u_with_noise = best_u + np.random.uniform(low=-1, high=1, size=None)
+            best_u_with_noise = best_u + np.random.uniform(low=-2, high=2, size=None)
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), round(best_u, 4), round(best_u_with_noise, 4))
                   )
