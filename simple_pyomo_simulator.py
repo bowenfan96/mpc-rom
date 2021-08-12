@@ -12,7 +12,7 @@ from pyomo.solvers import *
 
 from simple_nn_controller import *
 
-results_folder = "simple_replay_results/hp/"
+results_folder = "simple_replay_results/vertex05/"
 
 
 class SimpleSimulator:

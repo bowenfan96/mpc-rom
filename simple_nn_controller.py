@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "simple_replay_results/hp/"
+results_folder = "simple_replay_results/vertex05/"
 
 
 class Net(nn.Module):
