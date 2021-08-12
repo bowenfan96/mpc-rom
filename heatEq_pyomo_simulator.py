@@ -67,10 +67,6 @@ class HeatEqSimulator:
         x_init = np.full(shape=(N, ), fill_value=273)
         # x_init = np.random.randint(low=263, high=283, size=N)
 
-        # Set up controls
-        self.model.u0 = Var(self.model.time, bounds=(73, 473))
-        self.model.u1 = Var(self.model.time, bounds=(73, 473))
-
         # NOTE: Pyomo can simulate via scipy/casadi only if:
         # 1. model.u is indexed only by time, so Bu using matrix multiplication is not possible
         # 2. model contains if statements, so the ode cannot have conditions
@@ -138,6 +134,10 @@ class HeatEqSimulator:
         self.model.x19 = Var(self.model.time)
         self.model.x19_dot = DerivativeVar(self.model.x19, wrt=self.model.time)
         self.model.x19[0].fix(x_init[19])
+
+        # Set up controls
+        self.model.u0 = Var(self.model.time, bounds=(73, 473))
+        self.model.u1 = Var(self.model.time, bounds=(73, 473))
 
         # ODEs
         # Set up x0_dot = Ax + Bu
@@ -240,7 +240,7 @@ class HeatEqSimulator:
         # ----- OBJECTIVE AND COST FUNCTION -----
         # Objective:
         # We want to heat element 6 (x[5]) at the 1/3 position to 30 C, 303 K
-        # And element 13 (x[12]) at the 2/3 position to 60 C, 333 K
+        # And element 14 (x[13]) at the 2/3 position to 60 C, 333 K
         # We would like to minimize the controller costs too, in terms of how much heating or cooling is applied
 
         # Define weights for setpoint and controller objectives
@@ -250,7 +250,7 @@ class HeatEqSimulator:
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
-                   == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x12[_t] - 333) ** 2) \
+                   == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x13[_t] - 333) ** 2) \
                    + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
@@ -286,7 +286,7 @@ class HeatEqSimulator:
         # Each t, x0, x1, x2, etc, U, L, instantaneous cost, cost to go, should be a column
         # Label them and return a pandas dataframe
         t = []
-        # x and u are lists of lists
+        # x is a list of lists
         x = []
         u0 = []
         u1 = []
@@ -358,8 +358,6 @@ class HeatEqSimulator:
         mpc_results_df = pd.DataFrame(df_data)
         mpc_results_df_dropped_t0 = mpc_results_df.drop(index=0)
 
-        print(mpc_results_df)
-
         return mpc_results_df, mpc_results_df_dropped_t0
 
     def simulate_system_rng_controls(self):
@@ -378,23 +376,26 @@ class HeatEqSimulator:
         sim = Simulator(self.model, package="casadi")
         tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
 
-        print(profiles)
-
-        return
+        # profiles are given as 2D array: each row is a time instance, while the columns are:
+        # x0, x1 ... x19, L
 
         # For some reason both tsim and profiles contain duplicates
         # Use pandas to drop the duplicates first
         # profiles columns: x0, x1, L
-        deduplicate_df = pd.DataFrame(
-            {"t": tsim, "x0": profiles[:, 0], "x1": profiles[:, 1], "L": profiles[:, 2]}
-        )
-        deduplicate_df = deduplicate_df.round(10)
+        temp_dict = {"t": tsim}
+        for i in range(20):
+            temp_dict["x{}".format(i)] = profiles[:, i]
+        temp_dict["L"] = profiles[:, 20]
+
+        deduplicate_df = pd.DataFrame(temp_dict)
+        deduplicate_df = deduplicate_df.round(5)
         deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
 
         # Make dataframe from the simulator results
         t = deduplicate_df["t"]
-        x0 = deduplicate_df["x0"]
-        x1 = deduplicate_df["x1"]
+        x = []
+        for i in range(20):
+            x.append(deduplicate_df["x{}".format(i)])
         L = deduplicate_df["L"]
         u0 = u0_rng
         u1 = u1_rng
@@ -419,7 +420,7 @@ class HeatEqSimulator:
             ctg[time] += ctg[time + 1]
 
         # Calculate path violations
-        path = [x1[int(time * 10)] + 0.5 - 8 * (time - 0.5) ** 2 for time in t]
+        path = [x[5][int(time * 10)] - 313 for time in t]
         path_violation = []
         for p in path:
             if max(path) > 0:
@@ -427,10 +428,17 @@ class HeatEqSimulator:
             else:
                 path_violation.append(p)
 
-        rng_sim_results_df = pd.DataFrame(
-            {"t": t, "x0": x0, "x1": x1, "u0": u0, "u1": u1, "L": L,
-             "inst_cost": inst_cost, "ctg": ctg, "path_diff": path_violation}
-        )
+        temp_dict = {"t": t}
+        for i in range(20):
+            temp_dict["x{}".format(i)] = x[i]
+        temp_dict["u0"] = u0
+        temp_dict["u1"] = u1
+        temp_dict["L"] = L
+        temp_dict["inst_cost"] = inst_cost
+        temp_dict["ctg"] = ctg
+        temp_dict["path_diff"] = path_violation
+
+        rng_sim_results_df = pd.DataFrame(temp_dict)
         rng_sim_results_df_dropped_tf = rng_sim_results_df.drop(index=10)
 
         return rng_sim_results_df, rng_sim_results_df_dropped_tf
@@ -528,18 +536,17 @@ class HeatEqSimulator:
         t = dataframe["t"]
         ctg = dataframe["ctg"]
 
-        # Plot x[5] and x[12], the elements whose temperatures we are trying to control
+        # Plot x[5] and x[13], the elements whose temperatures we are trying to control
         x5 = dataframe["x5"]
-        x12 = dataframe["x12"]
+        x13 = dataframe["x13"]
         u0 = dataframe["u0"]
         u1 = dataframe["u1"]
 
-        # cst = dataframe["path_diff"]
-        # if cst.max() <= 0:
-        #     cst_status = "Pass"
-        # else:
-        #     cst_status = "Fail"
-        cst_status = "Null"
+        cst = dataframe["path_diff"]
+        if cst.max() <= 0:
+            cst_status = "Pass"
+        else:
+            cst_status = "Fail"
 
         # Check that the cost to go is equal to the Lagrangian cost integral
         assert np.isclose(ctg.iloc[0], dataframe["L"].iloc[-1], atol=0.01)
@@ -552,7 +559,7 @@ class HeatEqSimulator:
         axs[0].plot(t, np.full(shape=(t.size, ), fill_value=313), label="Constraint for $x_5$")
         axs[0].legend()
 
-        axs[1].plot(t, x12, label="$x_{12}$")
+        axs[1].plot(t, x13, label="$x_{13}$")
         axs[1].legend()
 
         axs[2].step(t, u0, label="$u_0$")
@@ -576,7 +583,10 @@ class HeatEqSimulator:
 
 
 def generate_trajectories(save_csv=False):
-    df_cols = ["t", "x5", "x12", "u", "L", "inst_cost", "ctg", "path_diff"]
+    df_cols = ["t"]
+    for i in range(20):
+        df_cols.append("x{}".format(i))
+    df_cols.extend(["u0", "u1", "L", "inst_cost", "ctg", "path_diff"])
     # 80 trajectories which obeyed the path constraint
     obey_path_df = pd.DataFrame(columns=df_cols)
     # 40 trajectories which violated the path constraint
@@ -587,7 +597,7 @@ def generate_trajectories(save_csv=False):
     num_good = 0
     num_bad = 0
 
-    while num_samples < 120:
+    while num_samples < 15:
 
         while num_good < 2:
             heatEq_sys = HeatEqSimulator()
@@ -614,9 +624,9 @@ def generate_trajectories(save_csv=False):
         print("Samples: ", num_samples)
 
     if save_csv:
-        simple_60_trajectories_df.to_csv("simple_120_trajectories_df.csv")
-        obey_path_df.to_csv("obey_path_df.csv")
-        violate_path_df.to_csv("violate_path_df.csv")
+        simple_60_trajectories_df.to_csv("heatEq_120_trajectories_df.csv")
+        obey_path_df.to_csv("heatEq_obey_path_df.csv")
+        violate_path_df.to_csv("heatEq_violate_path_df.csv")
 
 
 def load_pickle(filename):
@@ -709,7 +719,7 @@ def replay(trajectory_df_filename, buffer_capacity=240):
 
 
 if __name__ == "__main__":
-    # generate_trajectories(save_csv=False)
+    generate_trajectories(save_csv=True)
 
     # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
@@ -719,7 +729,7 @@ if __name__ == "__main__":
 
     # replay("simple_120_trajectories_df.csv")
 
-    heatEq_system = HeatEqSimulator()
-    print(heatEq_system.mpc_control())
-    main_res, _ = heatEq_system.parse_mpc_results()
-    heatEq_system.plot(main_res)
+    # heatEq_system = HeatEqSimulator()
+    # print(heatEq_system.mpc_control())
+    # main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system.plot(main_res)
