@@ -10,16 +10,29 @@ from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
 
-from simple_nn_controller import *
+from heatEq_nn_controller import *
 
-results_folder = "simple_replay_results/120traj/"
+results_folder = "heatEq_replay_results/"
 
 
-class SimpleSimulator:
-    def __init__(self, duration=1, x0_init=0, x1_init=-1):
+class HeatEqSimulator:
+    def __init__(self, duration=1, x0_init=0, x1_init=-1, num_dp=20):
         # Unique ID for savings csv and plots, based on model timestamp
         self.uid = datetime.datetime.now().strftime("%d-%H.%M.%S.%f")[:-3]
         print("Model uid", self.uid)
+
+        # ----- GENERATE THE MODEL -----
+        # Apply the method of lines on the heat equation to generate the A matrix
+        # Length of the rod = 1 m, number of segments = number of discretization points + 1
+        length = 1
+        num_segments = num_dp + 1
+        # Thermal diffusivity alpha
+        alpha = 0.01
+        segment_length = length / num_segments
+        # Constant
+        c = alpha / (segment_length ** 2)
+
+
 
         # ----- SET UP THE BASIC MODEL -----
         # Set up pyomo model structure
@@ -344,7 +357,7 @@ def generate_trajectories(save_csv=False):
     while num_samples < 120:
 
         while num_good < 2:
-            simple_sys = SimpleSimulator()
+            simple_sys = HeatEqSimulator()
             _, trajectory = simple_sys.simulate_system_rng_controls()
             if trajectory["path_diff"].max() <= 0:
                 simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
@@ -353,7 +366,7 @@ def generate_trajectories(save_csv=False):
                 num_samples += 1
 
         while num_bad < 1:
-            simple_sys = SimpleSimulator()
+            simple_sys = HeatEqSimulator()
             _, trajectory = simple_sys.simulate_system_rng_controls()
             if trajectory["path_diff"].max() > 0:
                 simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
@@ -395,7 +408,7 @@ def replay(trajectory_df_filename, buffer_capacity=240):
         best_cost_in_round = np.inf
 
         for run in range(6):
-            simple_sys = SimpleSimulator()
+            simple_sys = HeatEqSimulator()
             df_1s, df_point9s = simple_sys.simulate_system_nn_controls(nn_model)
 
             # Store the best result of this run if it passes constraints
@@ -464,7 +477,7 @@ def replay(trajectory_df_filename, buffer_capacity=240):
 if __name__ == "__main__":
     # generate_trajectories(save_csv=True)
 
-    # main_simple_sys = SimpleSimulator()
+    # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
     # main_res, _ = main_simple_sys.simulate_system_nn_controls(main_nn_model)
     # main_simple_sys.plot(main_res)

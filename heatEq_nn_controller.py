@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "simple_replay_results/120traj/"
+results_folder = "heatEq_replay_results/"
 
 
 class Net(nn.Module):
