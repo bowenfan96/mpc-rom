@@ -14,8 +14,9 @@ import numpy as np
 import pandas as pd
 
 import datetime
+from time import *
 
-matrices_folder = "matrices/simple/"
+matrices_folder = "C:/Users/FanBo/PycharmProjects/mpc-rom/matrices/simple/"
 results_folder = "results_csv/simple/"
 plots_folder = "results_plots/simple/"
 
@@ -109,6 +110,10 @@ class MPC:
 
         # Define derivative variables
         def ode_Ax(m, i, t):
+            # print(i)
+            # sleep(1)
+            # print(sum((m.x[j, t] * self.A[i][j]) for j in range(self.A.shape[1])))
+            # sleep(1)
             return sum((m.x[j, t] * self.A[i][j]) for j in range(self.A.shape[1]))
 
         # WHEN WE HAVE MORE THAN 1 CONTROLLER
@@ -122,6 +127,14 @@ class MPC:
 
         self.model.ode = ConstraintList()
 
+        self.model.L = Var(self.model.time)
+        self.model.dLdt = DerivativeVar(self.model.L, wrt=self.model.time)
+
+        # Edit finite element step size here
+        self.discretizer = TransformationFactory('dae.collocation')
+        self.discretizer.apply_to(self.model, wrt=self.model.time, nfe=self.duration*10,
+                                  scheme='LAGRANGE-RADAU', ncp=self.ncp)
+
         # FOR GENERAL X_DOT = AX + BU
         for time in self.model.time:
             for i in range(self.num_states):
@@ -130,16 +143,8 @@ class MPC:
                 )
                 # Fix variables based on initial values
                 self.model.x[i, 0].fix(self.x[i])
-
-        self.model.L = Var(self.model.time)
-        self.model.dLdt = DerivativeVar(self.model.L, wrt=self.model.time)
-
-        # Edit finite element step size here
-        self.discretizer = TransformationFactory('dae.collocation')
-        self.discretizer.apply_to(self.model, wrt=self.model.time, nfe=self.duration*10,
-                                  scheme='LAGRANGE-RADAU', ncp=self.ncp)
         # Force u to be piecewise linear
-        # self.discretizer.reduce_collocation_points(self.model, var=self.model.u, ncp=1, contset=self.model.time)
+        self.discretizer.reduce_collocation_points(self.model, var=self.model.u, ncp=1, contset=self.model.time)
 
         # define path constraint
         def path_con_rule(m, t):
@@ -336,7 +341,7 @@ class MPC:
         plt.xlabel("Time")
         # Tick at every 5 integer timesteps
         plt.xticks(range(0, self.duration+1, 5))
-        plt.savefig(plots_folder + "mpc_plot" + self.runtime + ".svg", format="svg")
+        # plt.savefig(plots_folder + "mpc_plot" + self.runtime + ".svg", format="svg")
         plt.show()
 
     def save_results(self, mpc_state=None, sys_state=None, mpc_action=None, ctg=None, output=None):
@@ -379,4 +384,4 @@ if __name__ == "__main__":
 
         mpc_x, mpc_u, mpc_v = mpc.solve(sim_sys=False)
         mpc.plot(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v)
-        mpc.save_results(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v)
+        # mpc.save_results(mpc_state=mpc_x, mpc_action=mpc_u, ctg=mpc_v)
