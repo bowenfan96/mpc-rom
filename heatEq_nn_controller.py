@@ -18,7 +18,7 @@ from scipy import optimize
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "heatEq_replay_results/ray11/"
+results_folder = "heatEq_replay_results/vertex05-moreExpl/"
 
 
 class xMOR(nn.Module):
@@ -217,8 +217,8 @@ class HeatEqNNController:
             best_u = [273, 273]
             best_ctg = np.inf
 
-            for u0 in np.linspace(start=173, stop=373, num=40):
-                for u1 in np.linspace(start=173, stop=373, num=40):
+            for u0 in np.linspace(start=173, stop=373, num=50):
+                for u1 in np.linspace(start=173, stop=373, num=50):
                     ctg_pred, cst_pred = self.predict_ctg_cst(x, [u0, u1])
 
                     # print(ctg_pred, cst_pred)
@@ -231,8 +231,8 @@ class HeatEqNNController:
 
             best_u = np.array(best_u).flatten()
             # Add some noise to encourage exploration
-            best_u0_with_noise = best_u[0] + np.random.randint(low=-2, high=2, size=None)
-            best_u1_with_noise = best_u[1] + np.random.randint(low=-2, high=2, size=None)
+            best_u0_with_noise = best_u[0] + np.random.uniform(low=-3, high=3, size=None)
+            best_u1_with_noise = best_u[1] + np.random.uniform(low=-3, high=3, size=None)
             best_u_with_noise = np.array((best_u0_with_noise, best_u1_with_noise)).flatten()
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), best_u.round(4), best_u_with_noise.round(4))
