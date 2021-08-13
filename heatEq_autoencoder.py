@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn import preprocessing
+import pysindy
 
 
 class Encoder(nn.Module):
@@ -33,7 +34,7 @@ class Encoder(nn.Module):
         xe1 = F.leaky_relu(self.input(x_in))
         xe2 = F.leaky_relu(self.h1(xe1))
         xe3 = F.leaky_relu(self.h2(xe2))
-        x_rom_out = F.leaky_relu(self.h3(xe3))
+        x_rom_out = (self.h3(xe3))
         return x_rom_out
 
 
@@ -58,12 +59,12 @@ class Decoder(nn.Module):
         xe1 = F.leaky_relu(self.input(x_rom_in))
         xe2 = F.leaky_relu(self.h1(xe1))
         xe3 = F.leaky_relu(self.h2(xe2))
-        x_full_out = F.leaky_relu(self.h3(xe3))
+        x_full_out = (self.h3(xe3))
         return x_full_out
 
 
 class Autoencoder:
-    def __init__(self, x_dim, x_rom_dim):
+    def __init__(self, x_dim, x_rom_dim=10):
         self.encoder = Encoder(x_dim, x_rom_dim)
         self.decoder = Decoder(x_dim, x_rom_dim)
 
@@ -88,8 +89,7 @@ class Autoencoder:
         self.encoder.train()
         self.decoder.train()
 
-        minibatch = torch.utils.data.TensorDataset(x)
-        mb_loader = torch.utils.data.DataLoader(minibatch, batch_size=120, shuffle=False)
+        mb_loader = torch.utils.data.DataLoader(x, batch_size=120, shuffle=False)
 
         param_wrapper = nn.ParameterList()
         param_wrapper.extend(self.encoder.parameters())
@@ -98,12 +98,12 @@ class Autoencoder:
         optimizer = optim.SGD(param_wrapper, lr=0.05)
         criterion = nn.MSELoss()
 
-        for epoch in range(500):
-            for x_mb, u_mb, ctg_mb, cst_mb in mb_loader:
+        for epoch in range(1000):
+            for x_mb in mb_loader:
                 optimizer.zero_grad()
                 x_rom_mb = self.encoder(x_mb)
                 x_full_pred_mb = self.decoder(x_rom_mb)
-                loss = criterion(x_full_pred_mb, x_rom_mb)
+                loss = criterion(x_full_pred_mb, x_mb)
                 loss.backward()
                 optimizer.step()
 
@@ -113,9 +113,40 @@ class Autoencoder:
             with torch.no_grad():
                 x_rom = self.encoder(x)
                 x_full_pred = self.decoder(x_rom)
-                loss = criterion(x_full_pred, x_rom)
-
+                loss = criterion(x_full_pred, x)
                 print("Epoch {}: Loss = {}".format(epoch, loss))
             self.encoder.train()
             self.decoder.train()
+
+    def encode(self, dataframe):
+        x = self.process_and_normalize_data(dataframe)
+        self.encoder.eval()
+        with torch.no_grad():
+            x_rom = self.encoder(x)
+
+        x_rom = x_rom.numpy()
+        # x_rom = self.scaler_x.inverse_transform(x_rom)
+
+        x_rom_df_cols = []
+        for i in range(x_rom.shape[1]):
+            x_rom_df_cols.append("x{}_rom".format(i))
+        x_rom_df = pd.DataFrame(x_rom, columns=x_rom_df_cols)
+
+        print(x_rom_df)
+
+
+def load_pickle(filename="heatEq_autoencoder.pickle"):
+    with open(filename, "rb") as model:
+        pickled_autoencoder = pickle.load(model)
+    print("Pickle loaded: " + filename)
+    return pickled_autoencoder
+
+
+if __name__ == "__main__":
+    data = pd.read_csv("heatEq_240_trajectories_df.csv")
+    autoencoder = Autoencoder(x_dim=20, x_rom_dim=10)
+    autoencoder.fit(data)
+
+    autoencoder.encode(data)
+
 
