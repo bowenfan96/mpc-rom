@@ -756,3 +756,4 @@ if __name__ == "__main__":
     heatEq_system.plot(main_res)
     pd.set_option('display.max_columns', None)
     print(main_res)
+    main_res.to_csv("heatEq_mpc_trajectory.csv")

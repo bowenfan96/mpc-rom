@@ -103,11 +103,11 @@ class HeatEqSimulator:
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
-                   == setpoint_weight * ((m.x0[_t] - 1.68571239) ** 2
-                                         + (m.x1[_t] - 0.88065856) ** 2
-                                         + (m.x2[_t] - (-0.21620381)) ** 2
-                                         + (m.x3[_t] - (-0.23563355)) ** 2
-                                         + (m.x4[_t] - 2.53726015) ** 2) \
+                   == setpoint_weight * ((m.x0[_t] - -0.203286) ** 2
+                                         + (m.x1[_t] - -0.271189) ** 2
+                                         + (m.x2[_t] - 0.407007) ** 2
+                                         + (m.x3[_t] - -0.666588) ** 2
+                                         + (m.x4[_t] - -0.234218) ** 2) \
                    # + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 

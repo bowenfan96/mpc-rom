@@ -89,6 +89,18 @@ class Autoencoder:
         x_tensor = torch.tensor(x)
         return x_tensor
 
+    def transform_data_without_fit(self, dataframe):
+        x = []
+        for i in range(20):
+            x.append(dataframe["x{}".format(i)].to_numpy(dtype=np.float32))
+
+        # x is fit with n rows and 20 columns, so we need to reshape it to this for transform
+        # Tranpose x to obtain a 2D array with shape (num_trajectories * time, 20)
+        x = np.array(x).transpose()
+        x = self.scaler_x.transform(x)
+        x_tensor = torch.tensor(x)
+        return x_tensor
+
     def fit(self, dataframe):
         x = self.process_and_normalize_data(dataframe)
 
@@ -104,7 +116,7 @@ class Autoencoder:
         optimizer = optim.SGD(param_wrapper, lr=0.05)
         criterion = nn.MSELoss()
 
-        for epoch in range(1000):
+        for epoch in range(500):
             for x_mb in mb_loader:
                 optimizer.zero_grad()
                 x_rom_mb = self.encoder(x_mb)
@@ -125,7 +137,8 @@ class Autoencoder:
             self.decoder.train()
 
     def encode(self, dataframe):
-        x = self.process_and_normalize_data(dataframe)
+        print(dataframe)
+        x = self.transform_data_without_fit(dataframe)
         self.encoder.eval()
         with torch.no_grad():
             x_rom = self.encoder(x)
@@ -156,153 +169,124 @@ class Autoencoder:
         return x_decoded
 
 
-def load_pickle(filename="heatEq_autoencoder.pickle"):
+def load_pickle(filename):
     with open(filename, "rb") as model:
         pickled_autoencoder = pickle.load(model)
     print("Pickle loaded: " + filename)
     return pickled_autoencoder
 
 
-def sindy(ae_model, dataframe):
+def sindy(ae_model, dataframe_fit, dataframe_score):
     # x_rom from autoencoder, returned as dataframe with shape (2400, 10)
-    x_rom = ae_model.encode(dataframe).to_numpy()
+    x_rom_fit = ae_model.encode(dataframe_fit).to_numpy()
+    x_rom_score = ae_model.encode(dataframe_score).to_numpy()
+
+    # Try to multiple x_rom to the same order to magnitude as u
+    x_rom_fit = x_rom_fit * 10
+    x_rom_score = x_rom_score * 10
 
     # Sindy needs to know the controller signals
-    u0 = dataframe["u0"].to_numpy().flatten()
-    u1 = dataframe["u1"].to_numpy().flatten()
+    u0_fit = dataframe_fit["u0"].to_numpy().flatten()
+    u1_fit = dataframe_fit["u1"].to_numpy().flatten()
+    u0_score = dataframe_score["u0"].to_numpy().flatten()
+    u1_score = dataframe_score["u1"].to_numpy().flatten()
 
     # We need to split x_rom and u to into a list of 240 trajectories for sindy
-    num_trajectories = 240
-    u0_list = np.split(u0, num_trajectories)
-    u1_list = np.split(u1, num_trajectories)
-    u_list = []
-    for u0, u1 in zip(u0_list, u1_list):
-        u_list.append(np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
-    x_rom_list = np.split(x_rom, num_trajectories, axis=0)
+    num_trajectories = 360
+    u0_list_fit = np.split(u0_fit, num_trajectories)
+    u1_list_fit = np.split(u1_fit, num_trajectories)
+    u_list_fit = []
+    for u0_fit, u1_fit in zip(u0_list_fit, u1_list_fit):
+        u_list_fit.append(np.hstack((u0_fit.reshape(-1, 1), u1_fit.reshape(-1, 1))))
+    x_rom_list_fit = np.split(x_rom_fit, num_trajectories, axis=0)
+
+    num_trajectories = 360
+    u0_list_score = np.split(u0_score, num_trajectories)
+    u1_list_score = np.split(u1_score, num_trajectories)
+    u_list_score = []
+    for u0_score, u1_score in zip(u0_list_score, u1_list_score):
+        u_list_score.append(np.hstack((u0_score.reshape(-1, 1), u1_score.reshape(-1, 1))))
+    x_rom_list_score = np.split(x_rom_score, num_trajectories, axis=0)
+
+    # print(u_list_fit)
+    # print(u_list_score)
 
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=2)
-    # Smooth our possibly noisy data (as it is generated with random spiky controls)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1)
+
+    # Smooth our possibly noisy data (as it is generated with random spiky controls) (doesn't work)
     smoothed_fd = pysindy.SmoothedFiniteDifference()
+
     # Tell Sindy that the data is recorded at 0.1s intervals
+    # sindy_model = pysindy.SINDy(t_default=0.1)
     sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library)
     # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
-    sindy_model.fit(x=x_rom_list, u=u_list, multiple_trajectories=True, unbias=True)
+
+    # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
+    sindy_model.fit(x=x_rom_list_fit, u=u_list_fit, multiple_trajectories=True)
     sindy_model.print()
-
-    # ----- SINDY FROM DEEPTIME -----
-    # Deeptime's sindy cannot recognize control terms, so we masquerade u0 and u1 as the last two x
-
-    library = PolynomialFeatures(degree=1)
-    optimizer = STLSQ(threshold=0.2)
-    estimator = SINDy(
-        library=library,
-        optimizer=optimizer,
-        input_features=["x", "y"]  # The feature names are just for printing
-    )
+    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True)
+    print(score)
 
     return
 
 
 def discover_objectives(ae_model):
-    # Perform a basinhopper search with powell to discover the model objective in the reduced space
-    # Find reduced state that minimizes:
-    # 0.995 * [(x_full_decoded_5 - 303) ** 2 + (x_full_decoded_13 - 333) ** 2] +
-    # 0.005 * [(u0 - 273) ** 2 + (u1 - 273) ** 2]
+    # Encode the final full state of the MPC controlled system
+    x_full_setpoint_dict = {}
 
-    def basinhopper_helper(x_rom_bh, *arg_u_bh):
-        # u_bh = arg_u_bh[0]
-        # u0 = np.array(u_bh).flatten()[0]
-        # u1 = np.array(u_bh).flatten()[1]
+    x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
+         302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
+         320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
+         327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
 
-        # Load the autoencoder and call its decoder to get the predicted values of x5 and x13
-        x_rom_bh = np.array(x_rom_bh, dtype=np.float32)
-        x_rom_bh = torch.tensor(x_rom_bh)
-        x_decoded = ae_model.decode(x_rom_bh)
-        x_decoded = x_decoded.flatten()
+    x = np.full(shape=(20, ), fill_value=1000)
 
-        # Compute objective value for the setpoint part
-        xd5 = x_decoded[5]
-        xd13 = x_decoded[13]
-        obj_val = (xd5 - 303) ** 2 + (xd13 - 333) ** 2
-        return obj_val
+    for i in range(20):
+        x_full_setpoint_dict["x{}".format(i)] = x[i]
 
-    # Configure options for the local minimizer (Powell)
-    gd_options = {}
-    # gd_options["maxiter"] = 2
-    gd_options["disp"] = True
-    # gd_options["eps"] = 1
-
-    # We choose Powell, which is gradientless, because our input to output mapping is not differentiable
-    min_kwargs = {
-        "method": 'Powell',
-        "options": gd_options
-    }
-
-    # x_rom_0 to x_rom_4 initial guess
-    x_rom_guess = np.full(shape=(5, ), fill_value=0)
-
-    result = optimize.basinhopping(
-        func=basinhopper_helper, x0=x_rom_guess, minimizer_kwargs=min_kwargs
-    )
-
-    # Return the x_rom values that give the closest x_full relative to the setpoint
+    x_full_setpoint_df = pd.DataFrame(x_full_setpoint_dict, index=[0])
     # This is our setpoint for the reduced model
-    x_rom_setpoints = np.array(result["x"]).flatten()
+    x_rom_setpoints = ae_model.encode(x_full_setpoint_df).to_numpy()
+
     print(x_rom_setpoints)
     return x_rom_setpoints
 
 
 if __name__ == "__main__":
-    # data = pd.read_csv("heatEq_240_trajectories_df.csv")
-
-    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
-    # autoencoder.fit(data)
+    data = pd.read_csv("heatEq_240_trajectories_df.csv")
+    autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
+    autoencoder.fit(data)
     # with open("heatEq_autoencoder_5dim.pickle", "wb") as model:
     #     pickle.dump(autoencoder, model)
 
-    # data = pd.read_csv("heatEq_240_trajectories_df.csv")
-
 
     # Get x_rom initial values
-    # x_init = np.full(shape=(1, 20), fill_value=273)
-    # x_init_df_col = []
-    # for i in range(20):
-    #     x_init_df_col.append("x{}".format(i))
-    # x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
+    x_init = np.full(shape=(1, 20), fill_value=273)
+    x_init_df_col = []
+    for i in range(20):
+        x_init_df_col.append("x{}".format(i))
+    x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
     # autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
-    # print(autoencoder.encode(x_init_df))
-    # Initial values for x_rom:
-    #      x0_rom    x1_rom    x2_rom    x3_rom    x4_rom
-    #   -0.203286 -0.271189  0.407007 -0.666588 -0.234218
+    x_rom_init_scaled = autoencoder.encode(x_init_df).to_numpy() * 10
+    print(x_rom_init_scaled)
+    # Initial values for x_rom (scaled by 10x):
+    #      x0_rom     x1_rom        x2_rom     x3_rom      x4_rom
+    #   6.1253166   8.008321    0.22415668 -4.0164347   8.4662285
 
 
-    # data = pd.read_csv("R47 heatEq_240_trajectories_df.csv")
+    # data_fit = pd.read_csv("R47 heatEq_240_trajectories_df.csv")
+    # data_score = pd.read_csv("R49 heatEq_240_trajectories_df.csv")
     # autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
-    # sindy(autoencoder, data)
-
-    # Sindy fit for degree 1
-    # x0' = -12.625 1 + 0.915 x0 + -24.623 x1 + -3.347 x3 + -11.467 x4
-    # x1' = -67.528 1 + 3232.952 x0 + -7013.098 x1 + -3960.334 x2 + 1307.525 x3 + -5009.076 x4
-    # x2' = -84.901 1 + 3067.923 x0 + -6685.955 x1 + -3747.449 x2 + 1233.639 x3 + -4761.072 x4
-    # x3' = -17.457 1 + 1.582 x0 + -22.597 x1 + 15.782 x2 + -6.529 x3
-    # x4' = 141.380 1 + -6370.022 x0 + 13831.149 x1 + 7799.579 x2 + -2573.599 x3 + 9873.393 x4
-
-    # Sindy fit for degree 2
-    # x0' = -86.337 1 + 10526.797 x0 + -22574.634 x1 + -12834.864 x2 + 4196.453 x3 + -15982.831 x4 + 416.963 x0^2 + -610.498 x1^2 + -36.191 x3^2 + 102.916 x4^2
-    # x1' = -99.895 1 + 8153.836 x0 + -17602.472 x1 + -9778.537 x2 + 3252.057 x3 + -12239.332 x4 + 295.086 x0^2 + -732.165 x1^2 + -95.043 x2^2 + -16.073 x3^2 + 183.958 x4^2
-    # x2' = -141.282 1 + 10815.599 x0 + -23367.518 x1 + -12881.589 x2 + 4292.769 x3 + -16117.669 x4 + 480.143 x0^2 + -1193.190 x1^2 + -157.342 x2^2 + -22.393 x3^2 + 302.014 x4^2
-    # x3' = -5.091 1 + -839.014 x0 + 1772.372 x1 + 1189.361 x2 + -373.919 x3 + 1498.993 x4 + 141.254 x0^2 + -376.704 x1^2 + -58.241 x2^2 + 0.115 x3^2 + 101.679 x4^2
-    # x4' = 216.162 1 + -17273.781 x0 + 37296.934 x1 + 20687.405 x2 + -6881.169 x3 + 25891.512 x4 + -659.484 x0^2 + 1622.126 x1^2 + 208.862 x2^2 + 34.354 x3^2 + -406.950 x4^2
+    # sindy(autoencoder, data_fit, data_score)
 
     # Discover setpoint for x_rom
-    autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
-    discover_objectives(autoencoder)
+    # autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
+    x_rom_setpoints = discover_objectives(autoencoder)
+    x_rom_setpoints_scaled = x_rom_setpoints * 10
+    print(x_rom_setpoints_scaled)
 
-    # Discovered setpoints for x_rom
-    # [1.10888901 1.65167426 0.38852846 0.09250596 5.45466693]
-    # [0.04778089 -1.00491062  1.35108469  0.80050275  3.28888439]
-    # [1.12985082  1.24368333 -0.46781554  0.04821881  4.01453943]
-    # [1.68571239  0.88065856 -0.21620381 -0.23563355  2.53726015] > Using this
+    # Discovered setpoints for x_rom (scaled)
+    # -0.203286 -0.271189  0.407007 -0.666588 -0.234218
