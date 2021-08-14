@@ -32,7 +32,7 @@ class HeatEqSimulator:
         # Initial values for x_rom:
         #      x0_rom    x1_rom    x2_rom    x3_rom    x4_rom
         #   -0.203286 -0.271189  0.407007 -0.666588 -0.234218
-        x_init = [-0.203286, -0.271189, 0.407007, -0.666588, -0.234218]
+        x_init = [-38.80465, -4.298748, 65.039635, -147.96707, -52.63922]
 
         # NOTE: Pyomo can simulate via scipy/casadi only if:
         # 1. model.u is indexed only by time, so Bu using matrix multiplication is not possible
@@ -62,27 +62,33 @@ class HeatEqSimulator:
         self.model.u0 = Var(self.model.time, bounds=(173, 373))
         self.model.u1 = Var(self.model.time, bounds=(173, 373))
 
+        # x0' = 7769149.7131 + -151255.558 x0 + -87800.330 x1 + -140319.799 x2 + 46491.535 x3 + -37807.701 x4 + -1.117 u0 + -1.100 u1
+        # x1' = 1122573.8321 + -21845.813 x0 + -12695.379 x1 + -20260.219 x2 + 6715.461 x3 + -5444.430 x4 + -0.139 u0 + -0.129 u1
+        # x2' = -5640898.6741 + 109818.855 x0 + 63750.531 x1 + 101878.377 x2 + -33754.750 x3 + 27445.793 x4 + 0.794 u0 + 0.783 u1
+        # x3' = 12490213.9981 + -243148.831 x0 + -141174.186 x1 + -225553.599 x2 + 74739.735 x3 + -60743.890 x4 + -1.783 u0 + -1.739 u1
+        # x4' = 2605548.1721 + -50715.154 x0 + -29456.870 x1 + -47041.362 x2 + 15588.982 x3 + -12656.697 x4 + -0.351 u0 + -0.343 u1
+
         # ODEs
         # Set up x0_dot = Ax + Bu
         def _ode_x0(m, _t):
-            return m.x0_dot[_t] == -12.6251 + 0.915 * self.model.x0[_t] + -24.623 * self.model.x1[_t] + -3.347 * self.model.x3[_t] + -11.467 * self.model.x4[_t]
+            return m.x0_dot[_t] == 7769149.7131 + -151255.558 * self.model.x0[_t] + -87800.330 * self.model.x1[_t] + -140319.799 * self.model.x2[_t] + 46491.535 * self.model.x3[_t] + -37807.701 * self.model.x4[_t] + -11.17 * self.model.u0[_t] + -11.00 * self.model.u1[_t]
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         # Set up x1_dot to x18_dot = Ax only
         def _ode_x1(m, _t):
-            return m.x1_dot[_t] == -67.5281 + 3232.952 * self.model.x0[_t] + -7013.098 * self.model.x1[_t] + -3960.334 * self.model.x2[_t] + 1307.525 * self.model.x3[_t] + -5009.076 * self.model.x4[_t]
+            return m.x1_dot[_t] == 1122573.8321 + -21845.813 * self.model.x0[_t] + -12695.379 * self.model.x1[_t] + -20260.219 * self.model.x2[_t] + 6715.461 * self.model.x3[_t] + -5444.430 * self.model.x4[_t] + -1.39 * self.model.u0[_t] + -1.29 * self.model.u1[_t]
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
         def _ode_x2(m, _t):
-            return m.x2_dot[_t] == -84.9011 + 3067.923 * self.model.x0[_t] + -6685.955 * self.model.x1[_t] + -3747.449 * self.model.x2[_t] + 1233.639 * self.model.x3[_t] + -4761.072 * self.model.x4[_t]
+            return m.x2_dot[_t] == -5640898.6741 + 109818.855 * self.model.x0[_t] + 63750.531 * self.model.x1[_t] + 101878.377 * self.model.x2[_t] + -33754.750 * self.model.x3[_t] + 27445.793 * self.model.x4[_t] + 7.94 * self.model.u0[_t] + 7.83 * self.model.u1[_t]
         self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         def _ode_x3(m, _t):
-            return m.x3_dot[_t] == -17.4571 + 1.582 * self.model.x0[_t] + -22.597 * self.model.x1[_t] + 15.782 * self.model.x2[_t] + -6.529 * self.model.x3[_t]
+            return m.x3_dot[_t] == 12490213.9981 + -243148.831 * self.model.x0[_t] + -141174.186 * self.model.x1[_t] + -225553.599 * self.model.x2[_t] + 74739.735 * self.model.x3[_t] + -60743.890 * self.model.x4[_t] + -17.83 * self.model.u0[_t] + -17.39 * self.model.u1[_t]
         self.model.x3_ode = Constraint(self.model.time, rule=_ode_x3)
 
         def _ode_x4(m, _t):
-            return m.x4_dot[_t] == 141.3801 + -6370.022 * self.model.x0[_t] + 13831.149 * self.model.x1[_t] + 7799.579 * self.model.x2[_t] + -2573.599 * self.model.x3[_t] + 9873.393 * self.model.x4[_t]
+            return m.x4_dot[_t] == 2605548.1721 + -50715.154 * self.model.x0[_t] + -29456.870 * self.model.x1[_t] + -47041.362 * self.model.x2[_t] + 15588.982 * self.model.x3[_t] + -12656.697 * self.model.x4[_t] + -3.51 * self.model.u0[_t] + -3.43 * self.model.u1[_t]
         self.model.x4_ode = Constraint(self.model.time, rule=_ode_x4)
 
         # Lagrangian cost
@@ -103,11 +109,11 @@ class HeatEqSimulator:
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
-                   == setpoint_weight * ((m.x0[_t] - -0.203286) ** 2
-                                         + (m.x1[_t] - -0.271189) ** 2
-                                         + (m.x2[_t] - 0.407007) ** 2
-                                         + (m.x3[_t] - -0.666588) ** 2
-                                         + (m.x4[_t] - -0.234218) ** 2) \
+                   == setpoint_weight * ((m.x0[_t] - -85.02493) ** 2
+                                         + (m.x1[_t] - -18.394802) ** 2
+                                         + (m.x2[_t] - 100.83086) ** 2
+                                         + (m.x3[_t] - -235.56361) ** 2
+                                         + (m.x4[_t] - -75.54978) ** 2) \
                    # + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 

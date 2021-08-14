@@ -551,6 +551,95 @@ class HeatEqSimulator:
 
         return nn_sim_results_df, nn_sim_results_df_dropped_tf
 
+    def simulate_system_sindy_controls(self):
+        timesteps = [timestep / 10 for timestep in range(11)]
+
+        u0_nn = [273, 173, 173, 173, 173, 173, 173, 173, 213.835, 241.622, 241.622]
+        u1_nn = [273, 248.855, 373, 373, 227.259, 220.155, 373, 373, 373, 373, 373]
+
+        self.model.var_input = Suffix(direction=Suffix.LOCAL)
+        # Create a dictionary of piecewise linear controller actions
+        u0_nn_profile = {timesteps[i]: u0_nn[i] for i in range(len(timesteps))}
+        u1_nn_profile = {timesteps[i]: u1_nn[i] for i in range(len(timesteps))}
+
+        # Update the control sequence to Pyomo
+        self.model.var_input[self.model.u0] = u0_nn_profile
+        self.model.var_input[self.model.u1] = u1_nn_profile
+
+        sim = Simulator(self.model, package="casadi")
+        tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
+
+        # For some reason both tsim and profiles contain duplicates
+        # Use pandas to drop the duplicates first
+        # profiles columns: x0, x1, ..., x19, L
+        temp_dict = {"t": tsim}
+        for j in range(20):
+            temp_dict["x{}".format(j)] = profiles[:, j]
+        temp_dict["L"] = profiles[:, 20]
+
+        deduplicate_df = pd.DataFrame(temp_dict)
+        deduplicate_df = deduplicate_df.round(4)
+        deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
+
+        # Make dataframe from the simulator results
+        t = deduplicate_df["t"]
+        x = []
+        for j in range(20):
+            x.append(deduplicate_df["x{}".format(j)])
+
+        # Note: at this point, x is a list of 20 pandas series, each series has 11 rows
+        # Check duplicates were removed correctly
+        assert len(t) == 11
+
+        # Make dataframe from the final simulator results
+        t = deduplicate_df["t"]
+        x = []
+        for i in range(20):
+            x.append(deduplicate_df["x{}".format(i)])
+        L = deduplicate_df["L"]
+        u0 = u0_nn
+        u1 = u1_nn
+        inst_cost = []
+        ctg = []
+
+        for time in range(len(t)):
+            # Instantaneous cost is L[t1] - L[t0]
+            if time == 10:
+                inst_cost.append(0)
+            else:
+                inst_cost.append(L[time + 1] - L[time])
+
+        # Calculate cost to go
+        for time in range(len(t)):
+            ctg.append(inst_cost[time])
+        # Sum backwards from tf
+        for time in reversed(range(len(t) - 1)):
+            ctg[time] += ctg[time + 1]
+
+        # Calculate path violations
+        path = [x[5][int(time * 10)] - 313 for time in t]
+        path_violation = []
+        for p in path:
+            if max(path) > 0:
+                path_violation.append(max(path))
+            else:
+                path_violation.append(p)
+
+        temp_dict = {"t": t}
+        for i in range(20):
+            temp_dict["x{}".format(i)] = x[i]
+        temp_dict["u0"] = u0
+        temp_dict["u1"] = u1
+        temp_dict["L"] = L
+        temp_dict["inst_cost"] = inst_cost
+        temp_dict["ctg"] = ctg
+        temp_dict["path_diff"] = path_violation
+
+        sindy_sim_results_df = pd.DataFrame(temp_dict)
+        sindy_sim_results_df_dropped_tf = sindy_sim_results_df.drop(index=10)
+
+        return sindy_sim_results_df, sindy_sim_results_df_dropped_tf
+
     def plot(self, dataframe, num_rounds=0, num_run_in_round=0):
         t = dataframe["t"]
         ctg = dataframe["ctg"]
@@ -598,7 +687,7 @@ class HeatEqSimulator:
             .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
         plt.savefig(fname=svg_filename, format="svg")
 
-        # plt.show()
+        plt.show()
         plt.close()
         return
 
@@ -751,9 +840,8 @@ if __name__ == "__main__":
     # replay("heatEq_240_trajectories_df.csv")
 
     heatEq_system = HeatEqSimulator()
-    print(heatEq_system.mpc_control())
-    main_res, _ = heatEq_system.parse_mpc_results()
+    main_res, _ = heatEq_system.simulate_system_sindy_controls()
     heatEq_system.plot(main_res)
-    pd.set_option('display.max_columns', None)
-    print(main_res)
-    main_res.to_csv("heatEq_mpc_trajectory.csv")
+    # pd.set_option('display.max_columns', None)
+    # print(main_res)
+    # main_res.to_csv("heatEq_mpc_trajectory.csv")
