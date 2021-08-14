@@ -145,14 +145,12 @@ class Autoencoder:
         # Expected shape of x_rom_nparr is (x_rom_dim, )
         # Reshape to match decoder dimensions
         x_rom_nparr = x_rom_nparr.reshape(1, 5)
-        x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
-            x_decoded = self.decoder(x_rom_tensor)
+            x_decoded = self.decoder(x_rom_nparr)
 
         # Scale x_decoded into x_full
         x_decoded = self.scaler_x.inverse_transform(x_decoded)
-        x_decoded = x_decoded.numpy()
 
         # Return x_decoded as a numpy array, not pandas dataframe (to the basinhopper)
         return x_decoded
@@ -208,53 +206,53 @@ def sindy(ae_model, dataframe):
     return
 
 
-def discover_objectives(ae_model, dataframe):
+def discover_objectives(ae_model):
     # Perform a basinhopper search with powell to discover the model objective in the reduced space
     # Find reduced state that minimizes:
     # 0.995 * [(x_full_decoded_5 - 303) ** 2 + (x_full_decoded_13 - 333) ** 2] +
     # 0.005 * [(u0 - 273) ** 2 + (u1 - 273) ** 2]
 
     def basinhopper_helper(x_rom_bh, *arg_u_bh):
-        u_bh = arg_u_bh[0]
-        u0 = np.array(u_bh).flatten()[0]
-        u1 = np.array(u_bh).flatten()[1]
+        # u_bh = arg_u_bh[0]
+        # u0 = np.array(u_bh).flatten()[0]
+        # u1 = np.array(u_bh).flatten()[1]
 
         # Load the autoencoder and call its decoder to get the predicted values of x5 and x13
+        x_rom_bh = np.array(x_rom_bh, dtype=np.float32)
+        x_rom_bh = torch.tensor(x_rom_bh)
         x_decoded = ae_model.decode(x_rom_bh)
+        x_decoded = x_decoded.flatten()
 
-        # Compute objective value
+        # Compute objective value for the setpoint part
         xd5 = x_decoded[5]
         xd13 = x_decoded[13]
-        obj_val = 0.995 * ((xd5 - 303) ** 2 + (xd13 - 333) ** 2) + 0.005 * ((u0 - 273) ** 2 + (u1 - 273) ** 2)
-
+        obj_val = (xd5 - 303) ** 2 + (xd13 - 333) ** 2
         return obj_val
 
     # Configure options for the local minimizer (Powell)
     gd_options = {}
-    gd_options["maxiter"] = 2
+    # gd_options["maxiter"] = 2
     gd_options["disp"] = True
     # gd_options["eps"] = 1
 
     # We choose Powell, which is gradientless, because our input to output mapping is not differentiable
     min_kwargs = {
-        "args": x,
         "method": 'Powell',
         "options": gd_options
     }
-    result = optimize.basinhopping(
-        func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
-    )
-    # result["x"] is the optimal u, don't be confused by the name!
-    u_opt = np.array(result["x"]).flatten()
-    # Add some noise to encourage exploration
-    u0_opt_with_noise = u_opt[0] + np.random.randint(low=-2, high=2, size=None)
-    u1_opt_with_noise = u_opt[1] + np.random.randint(low=-2, high=2, size=None)
-    best_u_with_noise = np.array((u0_opt_with_noise, u1_opt_with_noise)).flatten()
-    print("Best u given x = {} is {}, adding noise = {}"
-          .format(x.flatten().round(4), u_opt.round(4), best_u_with_noise.round(4))
-          )
-    return u_opt
 
+    # x_rom_0 to x_rom_4 initial guess
+    x_rom_guess = np.full(shape=(5, ), fill_value=0)
+
+    result = optimize.basinhopping(
+        func=basinhopper_helper, x0=x_rom_guess, minimizer_kwargs=min_kwargs
+    )
+
+    # Return the x_rom values that give the closest x_full relative to the setpoint
+    # This is our setpoint for the reduced model
+    x_rom_setpoints = np.array(result["x"]).flatten()
+    print(x_rom_setpoints)
+    return x_rom_setpoints
 
 
 if __name__ == "__main__":
@@ -281,9 +279,9 @@ if __name__ == "__main__":
     #   -0.203286 -0.271189  0.407007 -0.666588 -0.234218
 
 
-    data = pd.read_csv("R47 heatEq_240_trajectories_df.csv")
-    autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
-    sindy(autoencoder, data)
+    # data = pd.read_csv("R47 heatEq_240_trajectories_df.csv")
+    # autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
+    # sindy(autoencoder, data)
 
     # Sindy fit for degree 1
     # x0' = -12.625 1 + 0.915 x0 + -24.623 x1 + -3.347 x3 + -11.467 x4
@@ -298,3 +296,13 @@ if __name__ == "__main__":
     # x2' = -141.282 1 + 10815.599 x0 + -23367.518 x1 + -12881.589 x2 + 4292.769 x3 + -16117.669 x4 + 480.143 x0^2 + -1193.190 x1^2 + -157.342 x2^2 + -22.393 x3^2 + 302.014 x4^2
     # x3' = -5.091 1 + -839.014 x0 + 1772.372 x1 + 1189.361 x2 + -373.919 x3 + 1498.993 x4 + 141.254 x0^2 + -376.704 x1^2 + -58.241 x2^2 + 0.115 x3^2 + 101.679 x4^2
     # x4' = 216.162 1 + -17273.781 x0 + 37296.934 x1 + 20687.405 x2 + -6881.169 x3 + 25891.512 x4 + -659.484 x0^2 + 1622.126 x1^2 + 208.862 x2^2 + 34.354 x3^2 + -406.950 x4^2
+
+    # Discover setpoint for x_rom
+    autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
+    discover_objectives(autoencoder)
+
+    # Discovered setpoints for x_rom
+    # [1.10888901 1.65167426 0.38852846 0.09250596 5.45466693]
+    # [0.04778089 -1.00491062  1.35108469  0.80050275  3.28888439]
+    # [1.12985082  1.24368333 -0.46781554  0.04821881  4.01453943]
+    # [1.68571239  0.88065856 -0.21620381 -0.23563355  2.53726015] > Using this

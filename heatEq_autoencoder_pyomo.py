@@ -65,29 +65,25 @@ class HeatEqSimulator:
         # ODEs
         # Set up x0_dot = Ax + Bu
         def _ode_x0(m, _t):
-            return m.x0_dot[_t] ==
+            return m.x0_dot[_t] == -12.6251 + 0.915 * self.model.x0[_t] + -24.623 * self.model.x1[_t] + -3.347 * self.model.x3[_t] + -11.467 * self.model.x4[_t]
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         # Set up x1_dot to x18_dot = Ax only
         def _ode_x1(m, _t):
-            return m.x1_dot[_t] ==
+            return m.x1_dot[_t] == -67.5281 + 3232.952 * self.model.x0[_t] + -7013.098 * self.model.x1[_t] + -3960.334 * self.model.x2[_t] + 1307.525 * self.model.x3[_t] + -5009.076 * self.model.x4[_t]
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
         def _ode_x2(m, _t):
-            return m.x2_dot[_t] ==
+            return m.x2_dot[_t] == -84.9011 + 3067.923 * self.model.x0[_t] + -6685.955 * self.model.x1[_t] + -3747.449 * self.model.x2[_t] + 1233.639 * self.model.x3[_t] + -4761.072 * self.model.x4[_t]
         self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         def _ode_x3(m, _t):
-            return m.x3_dot[_t] ==
+            return m.x3_dot[_t] == -17.4571 + 1.582 * self.model.x0[_t] + -22.597 * self.model.x1[_t] + 15.782 * self.model.x2[_t] + -6.529 * self.model.x3[_t]
         self.model.x3_ode = Constraint(self.model.time, rule=_ode_x3)
 
         def _ode_x4(m, _t):
-            return m.x4_dot[_t] ==
+            return m.x4_dot[_t] == 141.3801 + -6370.022 * self.model.x0[_t] + 13831.149 * self.model.x1[_t] + 7799.579 * self.model.x2[_t] + -2573.599 * self.model.x3[_t] + 9873.393 * self.model.x4[_t]
         self.model.x4_ode = Constraint(self.model.time, rule=_ode_x4)
-
-        def _ode_x5(m, _t):
-            return m.x5_dot[_t] ==
-        self.model.x5_ode = Constraint(self.model.time, rule=_ode_x5)
 
         # Lagrangian cost
         self.model.L = Var(self.model.time)
@@ -107,8 +103,12 @@ class HeatEqSimulator:
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
-                   == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x13[_t] - 333) ** 2) \
-                   + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
+                   == setpoint_weight * ((m.x0[_t] - 1.68571239) ** 2
+                                         + (m.x1[_t] - 0.88065856) ** 2
+                                         + (m.x2[_t] - (-0.21620381)) ** 2
+                                         + (m.x3[_t] - (-0.23563355)) ** 2
+                                         + (m.x4[_t] - 2.53726015) ** 2) \
+                   # + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
         # Objective function is to minimize the Lagrangian cost integral
@@ -116,10 +116,10 @@ class HeatEqSimulator:
             return m.L[m.time.last()] - m.L[0]
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
-        # Constraint for the element at the 1/3 position: temperature must not exceed 313 K (10 K above setpoint)
-        def _constraint_x5(m, _t):
-            return m.x5[_t] <= 313
-        self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
+        # # Constraint for the element at the 1/3 position: temperature must not exceed 313 K (10 K above setpoint)
+        # def _constraint_x5(m, _t):
+        #     return m.x5[_t] <= 313
+        # self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form
@@ -136,6 +136,7 @@ class HeatEqSimulator:
     def mpc_control(self):
         mpc_solver = SolverFactory("ipopt", tee=True)
         mpc_results = mpc_solver.solve(self.model)
+        self.model.display()
 
         return mpc_results
 
@@ -609,5 +610,5 @@ if __name__ == "__main__":
 
     heatEq_system = HeatEqSimulator()
     print(heatEq_system.mpc_control())
-    main_res, _ = heatEq_system.parse_mpc_results()
-    heatEq_system.plot(main_res)
+    # main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system.plot(main_res)

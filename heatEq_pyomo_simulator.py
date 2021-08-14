@@ -754,3 +754,5 @@ if __name__ == "__main__":
     print(heatEq_system.mpc_control())
     main_res, _ = heatEq_system.parse_mpc_results()
     heatEq_system.plot(main_res)
+    pd.set_option('display.max_columns', None)
+    print(main_res)
