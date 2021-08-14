@@ -23,7 +23,7 @@ from scipy import optimize
 import time as python_timer
 
 data_folder = "data/"
-results_folder = "expReplay_results/edge09/"
+results_folder = "expReplay_results/point07_12nodes_h1ctg/"
 
 
 class xMOR(nn.Module):
@@ -50,7 +50,7 @@ class xMOR(nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self, x_rom_dim, u_dim, hidden_size=7):
+    def __init__(self, x_rom_dim, u_dim, hidden_size=12):
         super(Net, self).__init__()
 
         self.input = nn.Linear((x_rom_dim + u_dim), hidden_size)
@@ -222,8 +222,8 @@ class HeatEqNNController:
             best_u = [273, 273]
             best_ctg = np.inf
 
-            for u0 in np.linspace(start=173, stop=373, num=50):
-                for u1 in np.linspace(start=173, stop=373, num=50):
+            for u0 in np.linspace(start=173, stop=373, num=100):
+                for u1 in np.linspace(start=173, stop=373, num=100):
                     ctg_pred, cst_pred = self.predict_ctg_cst(x, [u0, u1])
 
                     # print(ctg_pred, cst_pred)
@@ -283,7 +283,7 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=5, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=10, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
