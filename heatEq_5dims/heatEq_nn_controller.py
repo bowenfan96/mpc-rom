@@ -23,7 +23,7 @@ from scipy import optimize
 import time as python_timer
 
 data_folder = "data/"
-results_folder = "expReplay_results/vertex05/"
+results_folder = "expReplay_results/edge09/"
 
 
 class xMOR(nn.Module):
@@ -215,7 +215,7 @@ class HeatEqNNController:
         else:
             return ctg_pred, cst_pred
 
-    def get_u_opt(self, x, mode="basinhopper"):
+    def get_u_opt(self, x, mode="grid"):
         x = np.array(x).flatten()
 
         if mode == "grid":
@@ -242,6 +242,16 @@ class HeatEqNNController:
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), best_u.round(4), best_u_with_noise.round(4))
                   )
+            # Make sure the noise doesn't go over bounds
+            if best_u_with_noise[0] > 373:
+                best_u_with_noise[0] = 373
+            elif best_u_with_noise[0] < 73:
+                best_u_with_noise[0] = 73
+            if best_u_with_noise[1] > 373:
+                best_u_with_noise[1] = 373
+            elif best_u_with_noise[1] < 73:
+                best_u_with_noise[1] = 73
+
             return best_u_with_noise
 
         elif mode == "basinhopper":
