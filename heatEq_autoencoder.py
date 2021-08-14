@@ -213,6 +213,7 @@ def discover_objectives(ae_model, dataframe):
     # Find reduced state that minimizes:
     # 0.995 * [(x_full_decoded_5 - 303) ** 2 + (x_full_decoded_13 - 333) ** 2] +
     # 0.005 * [(u0 - 273) ** 2 + (u1 - 273) ** 2]
+
     def basinhopper_helper(x_rom_bh, *arg_u_bh):
         u_bh = arg_u_bh[0]
         u0 = np.array(u_bh).flatten()[0]
@@ -234,16 +235,11 @@ def discover_objectives(ae_model, dataframe):
     gd_options["disp"] = True
     # gd_options["eps"] = 1
 
-    # Specify bounds to send to the Powell minimizer
-    bounds = optimize.Bounds(lb=np.array([173, 173], dtype=int), ub=np.array([373, 373], dtype=int))
-
-    # Powell is chosen because it is the only gradientless method that can handle bounds
-    # We need to it to gradientless because our input to output mapping is not differentiable
+    # We choose Powell, which is gradientless, because our input to output mapping is not differentiable
     min_kwargs = {
         "args": x,
         "method": 'Powell',
-        "options": gd_options,
-        "bounds": bounds
+        "options": gd_options
     }
     result = optimize.basinhopping(
         func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
