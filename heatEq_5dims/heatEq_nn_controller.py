@@ -22,11 +22,12 @@ from scipy import optimize
 
 import time as python_timer
 
-results_folder = "heatEq_replay_results/vertex05-moreExpl/"
+data_folder = "data/"
+results_folder = "expReplay_results/hp/"
 
 
 class xMOR(nn.Module):
-    def __init__(self, x_dim, x_rom_dim=10):
+    def __init__(self, x_dim, x_rom_dim=5):
         super(xMOR, self).__init__()
 
         self.input = nn.Linear(x_dim, (x_dim + x_rom_dim) // 2)
@@ -49,13 +50,12 @@ class xMOR(nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self, x_rom_dim, u_dim, hidden_size=12):
+    def __init__(self, x_rom_dim, u_dim, hidden_size=7):
         super(Net, self).__init__()
 
         self.input = nn.Linear((x_rom_dim + u_dim), hidden_size)
         self.h1 = nn.Linear(hidden_size, hidden_size)
         self.h2 = nn.Linear(hidden_size, hidden_size)
-
         # Output prediction on constraint obedience and cost to go, so 2 nodes
         self.h3 = nn.Linear(hidden_size, 2)
 
@@ -80,8 +80,8 @@ class Net(nn.Module):
 
 class HeatEqNNController:
     def __init__(self, x_dim, x_rom_dim, u_dim):
-        self.x_mor = xMOR(x_dim, x_rom_dim=10)
-        self.net = Net(x_rom_dim, u_dim, hidden_size=12)
+        self.x_mor = xMOR(x_dim, x_rom_dim)
+        self.net = Net(x_rom_dim, u_dim, hidden_size=7)
 
         self.scaler_x = preprocessing.MinMaxScaler()
         self.scaler_u = preprocessing.MinMaxScaler()
@@ -236,8 +236,8 @@ class HeatEqNNController:
 
             best_u = np.array(best_u).flatten()
             # Add some noise to encourage exploration
-            best_u0_with_noise = best_u[0] + np.random.uniform(low=-3, high=3, size=None)
-            best_u1_with_noise = best_u[1] + np.random.uniform(low=-3, high=3, size=None)
+            best_u0_with_noise = best_u[0] + np.random.uniform(low=-2, high=2, size=None)
+            best_u1_with_noise = best_u[1] + np.random.uniform(low=-2, high=2, size=None)
             best_u_with_noise = np.array((best_u0_with_noise, best_u1_with_noise)).flatten()
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), best_u.round(4), best_u_with_noise.round(4))
@@ -257,8 +257,8 @@ class HeatEqNNController:
 
             # Configure options for the local minimizer (Powell)
             gd_options = {}
-            gd_options["maxiter"] = 2
-            gd_options["disp"] = True
+            # gd_options["maxiter"] = 2
+            # gd_options["disp"] = True
             # gd_options["eps"] = 1
 
             # Specify bounds to send to the Powell minimizer
@@ -278,8 +278,8 @@ class HeatEqNNController:
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
             # Add some noise to encourage exploration
-            u0_opt_with_noise = u_opt[0] + np.random.randint(low=-2, high=2, size=None)
-            u1_opt_with_noise = u_opt[1] + np.random.randint(low=-2, high=2, size=None)
+            u0_opt_with_noise = u_opt[0] + np.random.uniform(low=-2, high=2, size=None)
+            u1_opt_with_noise = u_opt[1] + np.random.uniform(low=-2, high=2, size=None)
             best_u_with_noise = np.array((u0_opt_with_noise, u1_opt_with_noise)).flatten()
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), u_opt.round(4), best_u_with_noise.round(4))
@@ -288,7 +288,7 @@ class HeatEqNNController:
 
 
 def pickle_model(model, round_num):
-    pickle_filename = results_folder + "R{}_".format(round_num+1) + "heatEq_nn_controller.pickle"
+    pickle_filename = results_folder + "pickles/" + "R{}_".format(round_num+1) + "heatEq_nn_controller.pickle"
     with open(pickle_filename, "wb") as file:
         pickle.dump(model, file)
     print("Pickled model to " + pickle_filename)
@@ -298,13 +298,13 @@ def pickle_model(model, round_num):
 def train_and_pickle(round_num, trajectory_df_filename):
     print("Training with dataset: " + trajectory_df_filename)
     data = pd.read_csv(trajectory_df_filename)
-    simple_nn = HeatEqNNController(x_dim=20, x_rom_dim=10, u_dim=2)
+    simple_nn = HeatEqNNController(x_dim=20, x_rom_dim=5, u_dim=2)
     simple_nn.fit(data)
     pickle_filename = pickle_model(simple_nn, round_num)
     return pickle_filename
 
 
-def load_pickle(filename="heatEq_nn_controller_240.pickle"):
+def load_pickle(filename="heatEq_nn_controller_5dim.pickle"):
     with open(filename, "rb") as model:
         pickled_nn = pickle.load(model)
     print("Pickle loaded: " + filename)
@@ -312,11 +312,11 @@ def load_pickle(filename="heatEq_nn_controller_240.pickle"):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("heatEq_240_trajectories_df.csv")
-    heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=10, u_dim=2)
+    data = pd.read_csv(data_folder + "heatEq_240_trajectories_rng.csv")
+    heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=5, u_dim=2)
     heatEq_nn.fit(data)
 
-    # with open("heatEq_nn_controller_240.pickle", "wb") as pickle_file:
+    # with open("heatEq_nn_controller_5dim.pickle", "wb") as pickle_file:
     #     pickle.dump(heatEq_nn, pickle_file)
 
     # heatEq_nn = load_pickle()
