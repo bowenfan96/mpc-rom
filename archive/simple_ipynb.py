@@ -206,23 +206,23 @@ cp_in              = 1
 model_i = createmodel(t0=0, tf=1, x0=[0, -1], xtf=[])
 discretizer, model = discretize(model_i, nfe, 4, cp_in)
 
-for i in range(11):
-    x1 = po.value(model.x1[i/10])
-    x2 = po.value(model.x2[i/10])
-    # Get controls from basinhopping
-    gs = gridsearch.GridSearch()
-    u_opt = gs.search([x1, x2])
+# for i in range(11):
+#     x1 = po.value(model.x1[i/10])
+#     x2 = po.value(model.x2[i/10])
+#     # Get controls from basinhopping
+#     gs = gridsearch.GridSearch()
+#     u_opt = gs.search([x1, x2])
+#
+#     # ADD SOME NOISE
+#     u_opt += np.random.uniform(-1, 1)
+#
+#     # for time in model.t:
+#     #     if i/10 <= time < (i+1)/10:
+#     #         model.u[time].fix(u_opt)
+#
+#     results, model = solvemodel(model_i, 'ipopt')
 
-    # ADD SOME NOISE
-    u_opt += np.random.uniform(-1, 1)
-
-    for time in model.t:
-        if i/10 <= time < (i+1)/10:
-            model.u[time].fix(u_opt)
-
-    results, model = solvemodel(model_i, 'ipopt')
-
-# results, model = solvemodel(model_i, 'ipopt')
+results, model = solvemodel(model_i, 'ipopt')
 
 
 model.display()
@@ -231,7 +231,7 @@ print('Number of collocation points for manipulated variable (u): {0}'.format(cp
 t, x1, x2, u = presentresults(model_i)
 
 print("Status:")
-print(results.solver.status)
+print(results)
 
 data_df = pd.DataFrame(
     {"t": t,

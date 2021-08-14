@@ -748,9 +748,9 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    replay("heatEq_240_trajectories_df.csv")
+    # replay("heatEq_240_trajectories_df.csv")
 
-    # heatEq_system = HeatEqSimulator()
-    # print(heatEq_system.mpc_control())
-    # main_res, _ = heatEq_system.parse_mpc_results()
-    # heatEq_system.plot(main_res)
+    heatEq_system = HeatEqSimulator()
+    print(heatEq_system.mpc_control())
+    main_res, _ = heatEq_system.parse_mpc_results()
+    heatEq_system.plot(main_res)

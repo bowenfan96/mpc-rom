@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator
 from torch.utils.data import DataLoader
 from torchinfo import summary
 import pickle
@@ -17,6 +19,8 @@ from scipy import optimize
 # from functools import partial
 # from ray import tune
 # from ray.tune import CLIReporter
+
+import time as python_timer
 
 results_folder = "heatEq_replay_results/vertex05-moreExpl/"
 
@@ -210,7 +214,7 @@ class HeatEqNNController:
         else:
             return ctg_pred, cst_pred
 
-    def get_u_opt(self, x, mode="grid"):
+    def get_u_opt(self, x, mode="basinhopper"):
         x = np.array(x).flatten()
 
         if mode == "grid":
@@ -250,24 +254,25 @@ class HeatEqNNController:
                     ctg_pred_bh = ctg_pred_bh * 10
                 return ctg_pred_bh
 
-            # Configure options for the gradient descent optimizer
+            # Configure options for the local minimizer (Powell)
             gd_options = {}
-            # gd_options["maxiter"] = 1000
-            # gd_options["disp"] = True
+            gd_options["maxiter"] = 2
+            gd_options["disp"] = True
             # gd_options["eps"] = 1
 
-            # Specify bounds to send to the minimizer (cannot use with nelder-mead)
-            # bounds = optimize.Bounds([173, 373], [173, 373])
+            # Specify bounds to send to the Powell minimizer
+            bounds = optimize.Bounds(lb=np.array([173, 173], dtype=int), ub=np.array([373, 373], dtype=int))
 
-            # Nelder-mead is chosen because it is a gradientless method
+            # Powell is chosen because it is the only gradientless method that can handle bounds
+            # We need to it to gradientless because our input to output mapping is not differentiable
             min_kwargs = {
                 "args": x,
-                "method": 'nelder-mead',
-                "options": gd_options
-                # "bounds": bounds
+                "method": 'Powell',
+                "options": gd_options,
+                "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
@@ -298,10 +303,22 @@ def train_and_pickle(round_num, trajectory_df_filename):
     return pickle_filename
 
 
-if __name__ == "__main__":
-    data = pd.read_csv("heatEq_240_trajectories_df.csv")
-    heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=10, u_dim=2)
-    heatEq_nn.fit(data)
+def load_pickle(filename="heatEq_nn_controller_240.pickle"):
+    with open(filename, "rb") as model:
+        pickled_nn = pickle.load(model)
+    print("Pickle loaded: " + filename)
+    return pickled_nn
 
-    with open("heatEq_nn_controller_240.pickle", "wb") as pickle_file:
-        pickle.dump(heatEq_nn, pickle_file)
+
+if __name__ == "__main__":
+    # data = pd.read_csv("heatEq_240_trajectories_df.csv")
+    # heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=10, u_dim=2)
+    # heatEq_nn.fit(data)
+
+    # with open("heatEq_nn_controller_240.pickle", "wb") as pickle_file:
+    #     pickle.dump(heatEq_nn, pickle_file)
+
+    heatEq_nn = load_pickle()
+    x = np.full(shape=(20, ), fill_value=273)
+    heatEq_nn.get_u_opt(x)
+
