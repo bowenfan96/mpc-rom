@@ -11,7 +11,7 @@ from pyomo.solvers import *
 
 from heatEq_nn_controller import *
 
-results_folder = "expReplay_results/hp/"
+results_folder = "expReplay_results/ray11/"
 
 
 class HeatEqSimulator:
@@ -795,8 +795,8 @@ def replay(trajectory_df_filename, buffer_capacity=360):
                 trajectory_df = pd.concat([trajectory_df, df_temp])
 
         trajectory_df_filename = "R{} ".format(rp_round+1) + og_trajectory_df_filename
-        trajectory_df.to_csv(results_folder + "csvs/" + trajectory_df_filename)
-        pickle_filename = train_and_pickle(rp_round, results_folder + "pickles/" + trajectory_df_filename)
+        trajectory_df.to_csv(results_folder + trajectory_df_filename)
+        pickle_filename = train_and_pickle(rp_round, results_folder + trajectory_df_filename)
 
         # If best cost in round is better than current running best cost, add it to dictionary
         if len(best_cost_after_n_rounds) == 0:

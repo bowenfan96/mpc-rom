@@ -23,7 +23,7 @@ from scipy import optimize
 import time as python_timer
 
 data_folder = "data/"
-results_folder = "expReplay_results/hp/"
+results_folder = "expReplay_results/ray11/"
 
 
 class xMOR(nn.Module):
@@ -236,8 +236,8 @@ class HeatEqNNController:
 
             best_u = np.array(best_u).flatten()
             # Add some noise to encourage exploration
-            best_u0_with_noise = best_u[0] + np.random.uniform(low=-2, high=2, size=None)
-            best_u1_with_noise = best_u[1] + np.random.uniform(low=-2, high=2, size=None)
+            best_u0_with_noise = best_u[0] + np.random.randint(low=-2, high=2, size=None)
+            best_u1_with_noise = best_u[1] + np.random.randint(low=-2, high=2, size=None)
             best_u_with_noise = np.array((best_u0_with_noise, best_u1_with_noise)).flatten()
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), best_u.round(4), best_u_with_noise.round(4))
@@ -273,7 +273,7 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=10, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
@@ -284,11 +284,24 @@ class HeatEqNNController:
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), u_opt.round(4), best_u_with_noise.round(4))
                   )
-            return u_opt
+
+            # Make sure the noise doesn't go over bounds
+            if best_u_with_noise[0] > 373:
+                best_u_with_noise[0] = 373
+            elif best_u_with_noise[0] < 73:
+                best_u_with_noise[0] = 73
+            if best_u_with_noise[1] > 373:
+                best_u_with_noise[1] = 373
+            elif best_u_with_noise[1] < 73:
+                best_u_with_noise[1] = 73
+            best_u_with_noise[0] = int(best_u_with_noise[0])
+            best_u_with_noise[1] = int(best_u_with_noise[1])
+
+            return best_u_with_noise
 
 
 def pickle_model(model, round_num):
-    pickle_filename = results_folder + "pickles/" + "R{}_".format(round_num+1) + "heatEq_nn_controller.pickle"
+    pickle_filename = results_folder + "R{}_".format(round_num+1) + "heatEq_nn_controller.pickle"
     with open(pickle_filename, "wb") as file:
         pickle.dump(model, file)
     print("Pickled model to " + pickle_filename)
