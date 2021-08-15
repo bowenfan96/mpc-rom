@@ -190,8 +190,8 @@ class SimpleNNController:
                     best_u = u
                     best_ctg = ctg_pred
                 # Apply a finite penalty if constraints are broken
-                elif cst_pred > 0 and (ctg_pred * 2) < best_ctg:
-                    best_ctg = ctg_pred * 2
+                elif cst_pred > 0 and (ctg_pred * 5) < best_ctg:
+                    best_ctg = ctg_pred * 5
                     best_u = u
 
             # Add some noise to encourage exploration
