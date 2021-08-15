@@ -17,14 +17,15 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "simple_replay_results/ray11-2/"
+results_folder = "expReplay_results/ray11/"
 
 
 class Net(nn.Module):
-    def __init__(self, x_dim, u_dim, hidden_size=12):
+    def __init__(self, x_dim, u_dim, hidden_size=8):
         super(Net, self).__init__()
 
-        self.input = nn.Linear((x_dim + u_dim), hidden_size)
+        # Additional time node to learn a path constraint
+        self.input = nn.Linear((x_dim + u_dim + 1), hidden_size)
         self.h1 = nn.Linear(hidden_size, hidden_size)
         self.h2 = nn.Linear(hidden_size, hidden_size)
 
@@ -36,12 +37,12 @@ class Net(nn.Module):
         nn.init.kaiming_uniform_(self.h2.weight)
         nn.init.kaiming_uniform_(self.h3.weight)
 
-    def forward(self, x_in, u_in):
-        xu_in = torch.hstack((x_in, u_in))
-        xu_h1 = F.leaky_relu(self.input(xu_in))
-        xu_h2 = F.leaky_relu(self.h1(xu_h1))
-        xu_h3 = F.leaky_relu(self.h2(xu_h2))
-        out = F.leaky_relu(self.h3(xu_h3))
+    def forward(self, t_in, x_in, u_in):
+        txu_in = torch.hstack((t_in, x_in, u_in))
+        txu_h1 = F.leaky_relu(self.input(txu_in))
+        txu_h2 = F.leaky_relu(self.h1(txu_h1))
+        txu_h3 = F.leaky_relu(self.h2(txu_h2))
+        out = F.leaky_relu(self.h3(txu_h3))
 
         ctg = out[:, 0].view(-1, 1)
         constraint = out[:, 1].view(-1, 1)
@@ -60,18 +61,22 @@ class SimpleNNController:
         self.scaler_constraint = preprocessing.MinMaxScaler()
 
     def process_and_normalize_data(self, dataframe):
+        # Adding a time node to understand path constraints dependent on time
+        t = dataframe["t"]
         x0 = dataframe.filter(regex="x0")
         x1 = dataframe.filter(regex="x1")
         u = dataframe.filter(regex="u")
         ctg = dataframe.filter(regex="ctg")
         constraint = dataframe.filter(regex="path_diff")
 
+        t = t.to_numpy(dtype=np.float32).reshape(-1, 1)
         x0 = x0.to_numpy(dtype=np.float32)
         x1 = x1.to_numpy(dtype=np.float32)
         u = u.to_numpy(dtype=np.float32)
         ctg = ctg.to_numpy(dtype=np.float32)
         constraint = constraint.to_numpy(dtype=np.float32)
 
+        # No need to fit or transform t as it is already between 0 and 1
         self.scaler_x0.fit(x0)
         self.scaler_x1.fit(x1)
         self.scaler_u.fit(u)
@@ -84,6 +89,7 @@ class SimpleNNController:
         ctg = self.scaler_ctg.transform(ctg)
         constraint = self.scaler_constraint.transform(constraint)
 
+        t_tensor = torch.tensor(t)
         x0_tensor = torch.tensor(x0)
         x1_tensor = torch.tensor(x1)
         u_tensor = torch.tensor(u)
@@ -92,13 +98,13 @@ class SimpleNNController:
 
         x_tensor = torch.hstack((x0_tensor, x1_tensor))
 
-        return x_tensor, u_tensor, ctg_tensor, constraint_tensor
+        return t_tensor, x_tensor, u_tensor, ctg_tensor, constraint_tensor
 
     def fit(self, dataframe):
-        x, u, ctg, cst = self.process_and_normalize_data(dataframe)
+        t, x, u, ctg, cst = self.process_and_normalize_data(dataframe)
         self.net.train()
 
-        minibatch = torch.utils.data.TensorDataset(x, u, ctg, cst)
+        minibatch = torch.utils.data.TensorDataset(t, x, u, ctg, cst)
         mb_loader = torch.utils.data.DataLoader(minibatch, batch_size=60, shuffle=False)
 
         ctg_optimizer = optim.SGD(self.net.parameters(), lr=0.05)
@@ -107,11 +113,11 @@ class SimpleNNController:
         cst_criterion = nn.MSELoss()
 
         for epoch in range(300):
-            for x_mb, u_mb, ctg_mb, cst_mb in mb_loader:
+            for t_mb, x_mb, u_mb, ctg_mb, cst_mb in mb_loader:
                 ctg_optimizer.zero_grad()
                 cst_optimizer.zero_grad()
 
-                ctg_pred, cst_pred = self.net(x_mb, u_mb)
+                ctg_pred, cst_pred = self.net(t_mb, x_mb, u_mb)
 
                 loss_ctg = ctg_criterion(ctg_pred, ctg_mb)
                 loss_cst = cst_criterion(cst_pred, cst_mb)
@@ -124,7 +130,7 @@ class SimpleNNController:
             # Test on the whole dataset at this epoch
             self.net.eval()
             with torch.no_grad():
-                ctg_pred, cst_pred = self.net(x, u)
+                ctg_pred, cst_pred = self.net(t, x, u)
 
                 loss_ctg = ctg_criterion(ctg_pred, ctg)
                 loss_cst = cst_criterion(cst_pred, cst)
@@ -132,12 +138,13 @@ class SimpleNNController:
                 print("Epoch {}: loss_ctg = {} and loss_cst = {}".format(epoch, loss_ctg, loss_cst))
             self.net.train()
 
-    def predict_ctg_cst(self, x, u):
+    def predict_ctg_cst(self, t, x, u):
         # Process x
         x = np.array(x, dtype=np.float32)
         x = x.flatten()
         x0 = np.array(x[0]).reshape(1, 1)
         x1 = np.array(x[1]).reshape(1, 1)
+        t = np.array(t, dtype=np.float32).reshape(1, 1)
         u = np.array(u, dtype=np.float32).reshape(1, 1)
 
         # u must be between [-20, 20], so if basinhopper tries an invalid u, we penalize the ctg
@@ -152,10 +159,11 @@ class SimpleNNController:
         x1_tensor = torch.tensor(x1_scaled)
         u_tensor = torch.tensor(u_scaled)
         x_tensor = torch.hstack((x0_tensor, x1_tensor))
+        t_tensor = torch.tensor(t)
 
         self.net.eval()
         with torch.no_grad():
-            ctg_pred, cst_pred = self.net(x_tensor, u_tensor)
+            ctg_pred, cst_pred = self.net(t_tensor, x_tensor, u_tensor)
 
         ctg_pred = ctg_pred.detach().numpy()
         cst_pred = cst_pred.detach().numpy()
@@ -168,24 +176,34 @@ class SimpleNNController:
 
         return ctg_pred, cst_pred
 
-    def get_u_opt(self, x, mode="grid"):
+    def get_u_opt(self, t, x, mode="grid"):
         x = np.array(x).flatten().reshape((1, 2))
+        t = np.array(t).flatten().reshape((1, 1))
 
         if mode == "grid":
             best_u = -20
             best_ctg = np.inf
 
             for u in np.linspace(start=-20, stop=20, num=81):
-                ctg_pred, cst_pred = self.predict_ctg_cst(x, u)
+                ctg_pred, cst_pred = self.predict_ctg_cst(t, x, u)
                 if ctg_pred < best_ctg and cst_pred <= 0:
                     best_u = u
                     best_ctg = ctg_pred
+                # Apply a finite penalty if constraints are broken
+                elif cst_pred > 0 and (ctg_pred * 2) < best_ctg:
+                    best_ctg = ctg_pred * 2
 
             # Add some noise to encourage exploration
             best_u_with_noise = best_u + np.random.uniform(low=-0.2, high=0.2, size=None)
             print("Best u given x = {} is {}, adding noise = {}"
                   .format(x.flatten().round(4), round(best_u, 4), round(best_u_with_noise, 4))
                   )
+
+            # If noise pushes u out of bounds, adjust u to within bounds
+            if best_u_with_noise > 20:
+                best_u_with_noise = 20
+            elif best_u_with_noise < -20:
+                best_u_with_noise = -20
             return best_u_with_noise
 
 

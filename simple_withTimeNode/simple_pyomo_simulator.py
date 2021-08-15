@@ -12,7 +12,7 @@ from pyomo.solvers import *
 
 from simple_nn_controller import *
 
-results_folder = "simple_replay_results/ray11-2/"
+results_folder = "expReplay_results/ray11/"
 
 
 class SimpleSimulator:
@@ -206,7 +206,7 @@ class SimpleSimulator:
         # We call the neural net to predict the optimal u for x_i, then fix u time i
         for i in range(11):
             # Fetch optimal action, u, by calling the neural net with current_x
-            u_opt = nn_model.get_u_opt(current_x)
+            u_opt = nn_model.get_u_opt(timesteps[i], current_x)
 
             # Replace the control sequence of the current timestep with u_opt
             u_nn[i] = u_opt
@@ -387,7 +387,7 @@ def replay(trajectory_df_filename, buffer_capacity=240):
 
     best_cost_after_n_rounds = {}
 
-    for rp_round in range(150):
+    for rp_round in range(90):
         trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []
