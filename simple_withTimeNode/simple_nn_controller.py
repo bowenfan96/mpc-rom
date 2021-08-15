@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "expReplay_results/vertex05/"
+results_folder = "expReplay_results/ray11-2/"
 
 
 class Net(nn.Module):
@@ -192,6 +192,7 @@ class SimpleNNController:
                 # Apply a finite penalty if constraints are broken
                 elif cst_pred > 0 and (ctg_pred * 2) < best_ctg:
                     best_ctg = ctg_pred * 2
+                    best_u = u
 
             # Add some noise to encourage exploration
             best_u_with_noise = best_u + np.random.uniform(low=-1, high=1, size=None)
@@ -229,5 +230,5 @@ if __name__ == "__main__":
     simple_nn = SimpleNNController(x_dim=2, u_dim=1)
     simple_nn.fit(data)
 
-    with open("simple_nn_controller_120.pickle", "wb") as pickle_file:
-        pickle.dump(simple_nn, pickle_file)
+    # with open("simple_nn_controller_120.pickle", "wb") as pickle_file:
+    #     pickle.dump(simple_nn, pickle_file)
