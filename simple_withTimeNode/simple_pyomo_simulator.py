@@ -12,7 +12,7 @@ from pyomo.solvers import *
 
 from simple_nn_controller import *
 
-results_folder = "expReplay_results/ray11-2/"
+results_folder = "expReplay_results/texel13-2/"
 
 
 class SimpleSimulator:

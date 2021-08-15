@@ -17,7 +17,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "expReplay_results/ray11-2/"
+results_folder = "expReplay_results/texel13-2/"
 
 
 class Net(nn.Module):
@@ -190,8 +190,8 @@ class SimpleNNController:
                     best_u = u
                     best_ctg = ctg_pred
                 # Apply a finite penalty if constraints are broken
-                elif cst_pred > 0 and (ctg_pred * 5) < best_ctg:
-                    best_ctg = ctg_pred * 5
+                elif cst_pred > 0 and (ctg_pred * 3) < best_ctg:
+                    best_ctg = ctg_pred * 3
                     best_u = u
 
             # Add some noise to encourage exploration
