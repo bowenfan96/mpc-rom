@@ -211,7 +211,7 @@ class HeatEqNNController:
 
         # u must be between [173, 373], so if basinhopper tries an invalid u, we penalize the ctg
         if np.any(u < 173) or np.any(u > 373):
-            return ctg_pred, -1E9
+            return ctg_pred, 1E9
         else:
             return ctg_pred, cst_pred
 

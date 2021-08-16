@@ -21,7 +21,7 @@ results_folder = "expReplay_results/texel13-2/"
 
 
 class Net(nn.Module):
-    def __init__(self, x_dim, u_dim, hidden_size=8):
+    def __init__(self, x_dim, u_dim, hidden_size=10):
         super(Net, self).__init__()
 
         # Additional time node to learn a path constraint
@@ -30,19 +30,22 @@ class Net(nn.Module):
         self.h2 = nn.Linear(hidden_size, hidden_size)
 
         # Output prediction on constraint obedience and cost to go, so 2 nodes
-        self.h3 = nn.Linear(hidden_size, 2)
+        self.h3 = nn.Linear(hidden_size, hidden_size)
+        self.h4 = nn.Linear(hidden_size, 2)
 
         nn.init.kaiming_uniform_(self.input.weight)
         nn.init.kaiming_uniform_(self.h1.weight)
         nn.init.kaiming_uniform_(self.h2.weight)
         nn.init.kaiming_uniform_(self.h3.weight)
+        nn.init.kaiming_uniform_(self.h4.weight)
 
     def forward(self, t_in, x_in, u_in):
         txu_in = torch.hstack((t_in, x_in, u_in))
         txu_h1 = F.leaky_relu(self.input(txu_in))
         txu_h2 = F.leaky_relu(self.h1(txu_h1))
         txu_h3 = F.leaky_relu(self.h2(txu_h2))
-        out = F.leaky_relu(self.h3(txu_h3))
+        txu_h4 = F.leaky_relu(self.h3(txu_h3))
+        out = self.h4(txu_h4)
 
         ctg = out[:, 0].view(-1, 1)
         constraint = out[:, 1].view(-1, 1)
