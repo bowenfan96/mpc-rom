@@ -266,7 +266,7 @@ def discover_objectives(ae_model):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("heatEq_240_trajectories_df.csv")
+    data = pd.read_csv("data/heatEq_240_trajectories_df.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
     autoencoder.fit(data)
     # with open("heatEq_autoencoder_10dim.pickle", "wb") as model:

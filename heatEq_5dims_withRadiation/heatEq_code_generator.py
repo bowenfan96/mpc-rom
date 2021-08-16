@@ -58,3 +58,6 @@ for i in range(1, 19):
 
 for i in range(1, 19):
     print("temp_x.append(value(self.model.x{}[time]))".format(i))
+
+for i in range(20):
+    print(" + (m.x{}[_t] ** 4 - env_temp ** 4)".format(i))

@@ -11,7 +11,7 @@ from pyomo.solvers import *
 
 from heatEq_nn_controller import *
 
-results_folder = "expReplay_results/point07_12nodes_h1ctg/"
+results_folder = "expReplay_results/texel13/"
 
 
 class HeatEqSimulator:
@@ -135,100 +135,101 @@ class HeatEqSimulator:
         self.model.x19[0].fix(x_init[19])
 
         # Set up controls
-        self.model.u0 = Var(self.model.time, bounds=(173, 373))
-        self.model.u1 = Var(self.model.time, bounds=(173, 373))
+        self.model.u0 = Var(self.model.time, bounds=(173, 473))
+        self.model.u1 = Var(self.model.time, bounds=(173, 473))
 
+        sigma = -5.67e-8/2
+        env_temp = 273
         # ODEs
-        # Set up x0_dot = Ax + Bu
         def _ode_x0(m, _t):
-            return m.x0_dot[_t] == self.A[0][0] * m.x0[_t] + self.A[0][1] * m.x1[_t] + self.B[0][0] * m.u0[_t]
+            return m.x0_dot[_t] == self.A[0][0] * m.x0[_t] + self.A[0][1] * m.x1[_t] + self.B[0][0] * m.u0[_t] + sigma * (m.x0[_t] ** 4 - env_temp ** 4)
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         # Set up x1_dot to x18_dot = Ax only
         def _ode_x1(m, _t):
-            return m.x1_dot[_t] == self.A[1][1 - 1] * m.x0[_t] + self.A[1][1] * m.x1[_t] + self.A[1][1 + 1] * m.x2[_t]
+            return m.x1_dot[_t] == self.A[1][1 - 1] * m.x0[_t] + self.A[1][1] * m.x1[_t] + self.A[1][1 + 1] * m.x2[_t] + sigma * (m.x1[_t] ** 4 - env_temp ** 4)
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
         def _ode_x2(m, _t):
-            return m.x2_dot[_t] == self.A[2][2 - 1] * m.x1[_t] + self.A[2][2] * m.x2[_t] + self.A[2][2 + 1] * m.x3[_t]
+            return m.x2_dot[_t] == self.A[2][2 - 1] * m.x1[_t] + self.A[2][2] * m.x2[_t] + self.A[2][2 + 1] * m.x3[_t] + sigma * (m.x2[_t] ** 4 - env_temp ** 4)
         self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         def _ode_x3(m, _t):
-            return m.x3_dot[_t] == self.A[3][3 - 1] * m.x2[_t] + self.A[3][3] * m.x3[_t] + self.A[3][3 + 1] * m.x4[_t]
+            return m.x3_dot[_t] == self.A[3][3 - 1] * m.x2[_t] + self.A[3][3] * m.x3[_t] + self.A[3][3 + 1] * m.x4[_t] + sigma * (m.x3[_t] ** 4 - env_temp ** 4)
         self.model.x3_ode = Constraint(self.model.time, rule=_ode_x3)
 
         def _ode_x4(m, _t):
-            return m.x4_dot[_t] == self.A[4][4 - 1] * m.x3[_t] + self.A[4][4] * m.x4[_t] + self.A[4][4 + 1] * m.x5[_t]
+            return m.x4_dot[_t] == self.A[4][4 - 1] * m.x3[_t] + self.A[4][4] * m.x4[_t] + self.A[4][4 + 1] * m.x5[_t] + sigma * (m.x4[_t] ** 4 - env_temp ** 4)
         self.model.x4_ode = Constraint(self.model.time, rule=_ode_x4)
 
         def _ode_x5(m, _t):
-            return m.x5_dot[_t] == self.A[5][5 - 1] * m.x4[_t] + self.A[5][5] * m.x5[_t] + self.A[5][5 + 1] * m.x6[_t]
+            return m.x5_dot[_t] == self.A[5][5 - 1] * m.x4[_t] + self.A[5][5] * m.x5[_t] + self.A[5][5 + 1] * m.x6[_t] + sigma * (m.x5[_t] ** 4 - env_temp ** 4)
         self.model.x5_ode = Constraint(self.model.time, rule=_ode_x5)
 
         def _ode_x6(m, _t):
-            return m.x6_dot[_t] == self.A[6][6 - 1] * m.x5[_t] + self.A[6][6] * m.x6[_t] + self.A[6][6 + 1] * m.x7[_t]
+            return m.x6_dot[_t] == self.A[6][6 - 1] * m.x5[_t] + self.A[6][6] * m.x6[_t] + self.A[6][6 + 1] * m.x7[_t] + sigma * (m.x6[_t] ** 4 - env_temp ** 4)
         self.model.x6_ode = Constraint(self.model.time, rule=_ode_x6)
 
         def _ode_x7(m, _t):
-            return m.x7_dot[_t] == self.A[7][7 - 1] * m.x6[_t] + self.A[7][7] * m.x7[_t] + self.A[7][7 + 1] * m.x8[_t]
+            return m.x7_dot[_t] == self.A[7][7 - 1] * m.x6[_t] + self.A[7][7] * m.x7[_t] + self.A[7][7 + 1] * m.x8[_t] + sigma * (m.x7[_t] ** 4 - env_temp ** 4)
         self.model.x7_ode = Constraint(self.model.time, rule=_ode_x7)
 
         def _ode_x8(m, _t):
-            return m.x8_dot[_t] == self.A[8][8 - 1] * m.x7[_t] + self.A[8][8] * m.x8[_t] + self.A[8][8 + 1] * m.x9[_t]
+            return m.x8_dot[_t] == self.A[8][8 - 1] * m.x7[_t] + self.A[8][8] * m.x8[_t] + self.A[8][8 + 1] * m.x9[_t] + sigma * (m.x8[_t] ** 4 - env_temp ** 4)
         self.model.x8_ode = Constraint(self.model.time, rule=_ode_x8)
 
         def _ode_x9(m, _t):
-            return m.x9_dot[_t] == self.A[9][9 - 1] * m.x8[_t] + self.A[9][9] * m.x9[_t] + self.A[9][9 + 1] * m.x10[_t]
+            return m.x9_dot[_t] == self.A[9][9 - 1] * m.x8[_t] + self.A[9][9] * m.x9[_t] + self.A[9][9 + 1] * m.x10[_t] + sigma * (m.x9[_t] ** 4 - env_temp ** 4)
         self.model.x9_ode = Constraint(self.model.time, rule=_ode_x9)
 
         def _ode_x10(m, _t):
             return m.x10_dot[_t] == self.A[10][10 - 1] * m.x9[_t] + self.A[10][10] * m.x10[_t] + self.A[10][10 + 1] * \
-                   m.x11[_t]
+                   m.x11[_t] + sigma * (m.x10[_t] ** 4 - env_temp ** 4)
         self.model.x10_ode = Constraint(self.model.time, rule=_ode_x10)
 
         def _ode_x11(m, _t):
             return m.x11_dot[_t] == self.A[11][11 - 1] * m.x10[_t] + self.A[11][11] * m.x11[_t] + self.A[11][11 + 1] * \
-                   m.x12[_t]
+                   m.x12[_t] + sigma * (m.x11[_t] ** 4 - env_temp ** 4)
         self.model.x11_ode = Constraint(self.model.time, rule=_ode_x11)
 
         def _ode_x12(m, _t):
             return m.x12_dot[_t] == self.A[12][12 - 1] * m.x11[_t] + self.A[12][12] * m.x12[_t] + self.A[12][12 + 1] * \
-                   m.x13[_t]
+                   m.x13[_t] + sigma * (m.x12[_t] ** 4 - env_temp ** 4)
         self.model.x12_ode = Constraint(self.model.time, rule=_ode_x12)
 
         def _ode_x13(m, _t):
             return m.x13_dot[_t] == self.A[13][13 - 1] * m.x12[_t] + self.A[13][13] * m.x13[_t] + self.A[13][13 + 1] * \
-                   m.x14[_t]
+                   m.x14[_t] + sigma * (m.x13[_t] ** 4 - env_temp ** 4)
         self.model.x13_ode = Constraint(self.model.time, rule=_ode_x13)
 
         def _ode_x14(m, _t):
             return m.x14_dot[_t] == self.A[14][14 - 1] * m.x13[_t] + self.A[14][14] * m.x14[_t] + self.A[14][14 + 1] * \
-                   m.x15[_t]
+                   m.x15[_t] + sigma * (m.x14[_t] ** 4 - env_temp ** 4)
         self.model.x14_ode = Constraint(self.model.time, rule=_ode_x14)
 
         def _ode_x15(m, _t):
             return m.x15_dot[_t] == self.A[15][15 - 1] * m.x14[_t] + self.A[15][15] * m.x15[_t] + self.A[15][15 + 1] * \
-                   m.x16[_t]
+                   m.x16[_t] + sigma * (m.x15[_t] ** 4 - env_temp ** 4)
         self.model.x15_ode = Constraint(self.model.time, rule=_ode_x15)
 
         def _ode_x16(m, _t):
             return m.x16_dot[_t] == self.A[16][16 - 1] * m.x15[_t] + self.A[16][16] * m.x16[_t] + self.A[16][16 + 1] * \
-                   m.x17[_t]
+                   m.x17[_t] + sigma * (m.x16[_t] ** 4 - env_temp ** 4)
         self.model.x16_ode = Constraint(self.model.time, rule=_ode_x16)
 
         def _ode_x17(m, _t):
             return m.x17_dot[_t] == self.A[17][17 - 1] * m.x16[_t] + self.A[17][17] * m.x17[_t] + self.A[17][17 + 1] * \
-                   m.x18[_t]
+                   m.x18[_t] + sigma * (m.x17[_t] ** 4 - env_temp ** 4)
         self.model.x17_ode = Constraint(self.model.time, rule=_ode_x17)
 
         def _ode_x18(m, _t):
             return m.x18_dot[_t] == self.A[18][18 - 1] * m.x17[_t] + self.A[18][18] * m.x18[_t] + self.A[18][18 + 1] * \
-                   m.x19[_t]
+                   m.x19[_t] + sigma * (m.x18[_t] ** 4 - env_temp ** 4)
         self.model.x18_ode = Constraint(self.model.time, rule=_ode_x18)
 
         # Set up x19_dot = Ax + Bu
         def _ode_x19(m, _t):
-            return m.x19_dot[_t] == self.A[19][19] * m.x19[_t] + self.A[19][18] * m.x18[_t] + self.B[19][1] * m.u1[_t]
+            return m.x19_dot[_t] == self.A[19][19] * m.x19[_t] + self.A[19][18] * m.x18[_t] + self.B[19][1] * m.u1[_t] + sigma * (m.x19[_t] ** 4 - env_temp ** 4)
         self.model.x19_ode = Constraint(self.model.time, rule=_ode_x19)
 
         # Lagrangian cost
@@ -277,6 +278,7 @@ class HeatEqSimulator:
 
     def mpc_control(self):
         mpc_solver = SolverFactory("ipopt", tee=True)
+        # mpc_solver.options['max_iter'] = 10000
         mpc_results = mpc_solver.solve(self.model)
 
         return mpc_results
@@ -361,8 +363,8 @@ class HeatEqSimulator:
 
     def simulate_system_rng_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
-        u0_rng = np.random.uniform(low=173, high=373, size=11)
-        u1_rng = np.random.uniform(low=173, high=373, size=11)
+        u0_rng = np.random.uniform(low=173, high=473, size=11)
+        u1_rng = np.random.uniform(low=173, high=473, size=11)
 
         # Create a dictionary of piecewise linear controller actions
         u0_rng_profile = {timesteps[i]: u0_rng[i] for i in range(len(timesteps))}
@@ -846,3 +848,8 @@ if __name__ == "__main__":
     # pd.set_option('display.max_columns', None)
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
+
+    # heatEq_system = HeatEqSimulator()
+    # heatEq_system.mpc_control()
+    # main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system.plot(main_res)

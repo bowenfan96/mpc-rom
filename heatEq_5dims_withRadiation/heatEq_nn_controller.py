@@ -23,7 +23,7 @@ from scipy import optimize
 import time as python_timer
 
 data_folder = "data/"
-results_folder = "expReplay_results/point07_12nodes_h1ctg/"
+results_folder = "expReplay_results/texel13/"
 
 
 class xMOR(nn.Module):
@@ -209,21 +209,21 @@ class HeatEqNNController:
         ctg_pred = ctg_pred.item()
         cst_pred = cst_pred.item()
 
-        # u must be between [173, 373], so if basinhopper tries an invalid u, we penalize the ctg
-        if np.any(u < 173) or np.any(u > 373):
+        # u must be between [173, 473], so if basinhopper tries an invalid u, we penalize the ctg
+        if np.any(u < 173) or np.any(u > 473):
             return ctg_pred, 1E9
         else:
             return ctg_pred, cst_pred
 
-    def get_u_opt(self, x, mode="grid"):
+    def get_u_opt(self, x, mode="basinhopper"):
         x = np.array(x).flatten()
 
         if mode == "grid":
-            best_u = [273, 273]
+            best_u = [373, 373]
             best_ctg = np.inf
 
-            for u0 in np.linspace(start=173, stop=373, num=100):
-                for u1 in np.linspace(start=173, stop=373, num=100):
+            for u0 in np.linspace(start=173, stop=473, num=100):
+                for u1 in np.linspace(start=173, stop=473, num=100):
                     ctg_pred, cst_pred = self.predict_ctg_cst(x, [u0, u1])
 
                     # print(ctg_pred, cst_pred)
@@ -243,12 +243,12 @@ class HeatEqNNController:
                   .format(x.flatten().round(4), best_u.round(4), best_u_with_noise.round(4))
                   )
             # Make sure the noise doesn't go over bounds
-            if best_u_with_noise[0] > 373:
-                best_u_with_noise[0] = 373
+            if best_u_with_noise[0] > 473:
+                best_u_with_noise[0] = 473
             elif best_u_with_noise[0] < 73:
                 best_u_with_noise[0] = 73
-            if best_u_with_noise[1] > 373:
-                best_u_with_noise[1] = 373
+            if best_u_with_noise[1] > 473:
+                best_u_with_noise[1] = 473
             elif best_u_with_noise[1] < 73:
                 best_u_with_noise[1] = 73
 
@@ -272,7 +272,7 @@ class HeatEqNNController:
             # gd_options["eps"] = 1
 
             # Specify bounds to send to the Powell minimizer
-            bounds = optimize.Bounds(lb=np.array([173, 173], dtype=int), ub=np.array([373, 373], dtype=int))
+            bounds = optimize.Bounds(lb=np.array([173, 173], dtype=int), ub=np.array([473, 473], dtype=int))
 
             # Powell is chosen because it is the only gradientless method that can handle bounds
             # We need to it to gradientless because our input to output mapping is not differentiable
@@ -283,7 +283,7 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=10, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=3, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
@@ -296,12 +296,12 @@ class HeatEqNNController:
                   )
 
             # Make sure the noise doesn't go over bounds
-            if best_u_with_noise[0] > 373:
-                best_u_with_noise[0] = 373
+            if best_u_with_noise[0] > 473:
+                best_u_with_noise[0] = 473
             elif best_u_with_noise[0] < 73:
                 best_u_with_noise[0] = 73
-            if best_u_with_noise[1] > 373:
-                best_u_with_noise[1] = 373
+            if best_u_with_noise[1] > 473:
+                best_u_with_noise[1] = 473
             elif best_u_with_noise[1] < 73:
                 best_u_with_noise[1] = 73
             best_u_with_noise[0] = int(best_u_with_noise[0])
@@ -335,7 +335,7 @@ def load_pickle(filename="heatEq_nn_controller_5dim.pickle"):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv(data_folder + "heatEq_240_trajectories_rng.csv")
+    data = pd.read_csv(data_folder + "heatEq_240_trajectories_df.csv")
     heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=5, u_dim=2)
     heatEq_nn.fit(data)
 
