@@ -27,7 +27,7 @@ results_folder = "expReplay_results/arc12/"
 
 
 class xMOR(nn.Module):
-    def __init__(self, x_dim, x_rom_dim=3):
+    def __init__(self, x_dim, x_rom_dim=5):
         super(xMOR, self).__init__()
 
         self.input = nn.Linear(x_dim, (x_dim + x_rom_dim) // 2)
@@ -336,10 +336,10 @@ def load_pickle(filename="heatEq_nn_controller_5dim.pickle"):
 
 if __name__ == "__main__":
     data = pd.read_csv(data_folder + "heatEq_240_trajectories_df.csv")
-    heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=3, u_dim=2)
+    heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=5, u_dim=2)
     heatEq_nn.fit(data)
 
-    with open("heatEq_nn_controller_3dim.pickle", "wb") as pickle_file:
+    with open("heatEq_nn_controller_5dim.pickle", "wb") as pickle_file:
         pickle.dump(heatEq_nn, pickle_file)
 
     # heatEq_nn = load_pickle()
