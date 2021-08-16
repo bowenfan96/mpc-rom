@@ -260,9 +260,9 @@ class HeatEqSimulator:
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
         # Constraint for the element at the 1/3 position: path constraint for additional challenge
-        # 2t^2 + 5t + 296
+        # 5t^2 + 10t + 293
         def _constraint_x5(m, _t):
-            return m.x5[_t] <= (2 * _t ** 2) + (5 * _t) + 298
+            return m.x5[_t] <= (5 * _t ** 2) + (10 * _t) + 293
         self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
@@ -423,7 +423,8 @@ class HeatEqSimulator:
             ctg[time] += ctg[time + 1]
 
         # Calculate path violations
-        path = [x[5][int(time * 10)] - 313 for time in t]
+        # 5t^2 + 10t + 293
+        path = [x[5][int(time * 10)] - (5 * time ** 2 + 10 * time + 293) for time in t]
         path_violation = []
         for p in path:
             if max(path) > 0:
@@ -530,7 +531,8 @@ class HeatEqSimulator:
             ctg[time] += ctg[time + 1]
 
         # Calculate path violations
-        path = [x[5][int(time * 10)] - 313 for time in t]
+        # 5t^2 + 10t + 293
+        path = [x[5][int(time * 10)] - (5 * time ** 2 + 10 * time + 293) for time in t]
         path_violation = []
         for p in path:
             if max(path) > 0:
@@ -669,8 +671,9 @@ class HeatEqSimulator:
         fig.set_size_inches(5, 10)
 
         x5_path_cst = []
+        # 5t^2 + 10t + 293
         for ts in t:
-            x5_path_cst.append((2 * ts ** 2) + (5 * ts) + 298)
+            x5_path_cst.append((5 * ts ** 2) + (10 * ts) + 293)
 
         axs[0].plot(t, x5, label="$x_5$")
         axs[0].plot(t, x5_path_cst, label="Path constraint for $x_5$")
