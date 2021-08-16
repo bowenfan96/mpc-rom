@@ -23,7 +23,7 @@ from scipy import optimize
 import time as python_timer
 
 data_folder = "data/"
-results_folder = "expReplay_results/vertex05/"
+results_folder = "expReplay_results/edge09/"
 
 
 class xMOR(nn.Module):
@@ -215,7 +215,7 @@ class HeatEqNNController:
         else:
             return ctg_pred, cst_pred
 
-    def get_u_opt(self, x, mode="basinhopper"):
+    def get_u_opt(self, x, mode="grid"):
         x = np.array(x).flatten()
 
         if mode == "grid":
