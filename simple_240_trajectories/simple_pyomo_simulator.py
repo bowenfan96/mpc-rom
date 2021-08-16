@@ -390,7 +390,7 @@ def replay(trajectory_df_filename, buffer_capacity=360):
 
     best_cost_after_n_rounds = {}
 
-    for rp_round in range(150):
+    for rp_round in range(90):
         trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
         nn_model = load_pickle(pickle_filename)
         run_trajectories = []
