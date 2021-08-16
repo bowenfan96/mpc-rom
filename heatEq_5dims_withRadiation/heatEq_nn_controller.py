@@ -23,7 +23,7 @@ from scipy import optimize
 import time as python_timer
 
 data_folder = "data/"
-results_folder = "expReplay_results/texel13/"
+results_folder = "expReplay_results/ray11/"
 
 
 class xMOR(nn.Module):
@@ -283,7 +283,7 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=3, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=5, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
