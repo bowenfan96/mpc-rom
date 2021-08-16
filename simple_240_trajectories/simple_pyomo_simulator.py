@@ -300,18 +300,20 @@ class SimpleSimulator:
         # assert np.isclose(ctg[0], dataframe["L"].iloc[-1], atol=0.01)
         total_cost = round(ctg[0], 3)
 
-        fig, axs = plt.subplots(2, constrained_layout=True)
-        fig.set_size_inches(5, 6.7)
+        fig, axs = plt.subplots(3, constrained_layout=True)
+        fig.set_size_inches(5, 10)
 
         axs[0].plot(t, x0, label="$x_0$")
-        axs[0].plot(t, x1, label="$x_1$")
-        axs[0].plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label="Path constraint for $x_1$")
-        axs[0].plot(t, np.full(shape=(t.size, ), fill_value=0), "--",label="Setpoint for $x_1$ and $x_2$")
-        axs[0].set_ylim([-2.5, 1])
+        axs[0].plot(t, np.full(shape=(t.size,), fill_value=0), "--", label="Setpoint for $x_0$")
         axs[0].legend()
 
-        axs[1].step(t, u, label="Neural net controller action, u")
+        axs[1].plot(t, -0.5 + 8 * (np.array(t) - 0.5) ** 2, label="Path constraint for $x_1$")
+        axs[1].plot(t, np.full(shape=(t.size, ), fill_value=0), "--", label="Setpoint for $x_1$")
+        axs[1].plot(t, x1, label="$x_1$")
         axs[1].legend()
+
+        axs[2].step(t, u, label="Neural net controller action, u")
+        axs[2].legend()
 
         fig.suptitle("Control policy and system state after {} rounds of training \n "
                      "Run {}: Cost = {}, Constraint = {}"
