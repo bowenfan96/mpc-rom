@@ -18,7 +18,7 @@ from sklearn import preprocessing
 # from ray import tune
 # from ray.tune import CLIReporter
 
-results_folder = "expReplay_results/ray11/"
+results_folder = "expReplay_results/texel13/"
 
 
 class Net(nn.Module):
