@@ -333,38 +333,38 @@ class HeatEqNNController:
             return ctg_pred, 1E9
         else:
             return ctg_pred, cst_pred
-
-    def get_u_opt(self, x):
-        x = np.array(x).flatten()
-        self.x_mor.eval()
-        self.net.eval()
-        with torch.no_grad():
-            x_rom = self.x_mor(x)
-            ctg_mb, cst_mb = self.net(x_rom, u_opt_mb)
-
-        # result["x"] is the optimal u, don't be confused by the name!
-        u_opt = np.array(result["x"]).flatten()
-        # Add some noise to encourage exploration
-        u0_opt_with_noise = u_opt[0] + np.random.uniform(low=-2, high=2, size=None)
-        u1_opt_with_noise = u_opt[1] + np.random.uniform(low=-2, high=2, size=None)
-        best_u_with_noise = np.array((u0_opt_with_noise, u1_opt_with_noise)).flatten()
-        print("Best u given x = {} is {}, adding noise = {}"
-              .format(x.flatten().round(4), u_opt.round(4), best_u_with_noise.round(4))
-              )
-
-        # Make sure the noise doesn't go over bounds
-        if best_u_with_noise[0] > 373:
-            best_u_with_noise[0] = 373
-        elif best_u_with_noise[0] < 73:
-            best_u_with_noise[0] = 73
-        if best_u_with_noise[1] > 373:
-            best_u_with_noise[1] = 373
-        elif best_u_with_noise[1] < 73:
-            best_u_with_noise[1] = 73
-        best_u_with_noise[0] = int(best_u_with_noise[0])
-        best_u_with_noise[1] = int(best_u_with_noise[1])
-
-            return best_u_with_noise
+    #
+    # def get_u_opt(self, x):
+    #     x = np.array(x).flatten()
+    #     self.x_mor.eval()
+    #     self.net.eval()
+    #     with torch.no_grad():
+    #         x_rom = self.x_mor(x)
+    #         ctg_mb, cst_mb = self.net(x_rom, u_opt_mb)
+    #
+    #     # result["x"] is the optimal u, don't be confused by the name!
+    #     u_opt = np.array(result["x"]).flatten()
+    #     # Add some noise to encourage exploration
+    #     u0_opt_with_noise = u_opt[0] + np.random.uniform(low=-2, high=2, size=None)
+    #     u1_opt_with_noise = u_opt[1] + np.random.uniform(low=-2, high=2, size=None)
+    #     best_u_with_noise = np.array((u0_opt_with_noise, u1_opt_with_noise)).flatten()
+    #     print("Best u given x = {} is {}, adding noise = {}"
+    #           .format(x.flatten().round(4), u_opt.round(4), best_u_with_noise.round(4))
+    #           )
+    #
+    #     # Make sure the noise doesn't go over bounds
+    #     if best_u_with_noise[0] > 373:
+    #         best_u_with_noise[0] = 373
+    #     elif best_u_with_noise[0] < 73:
+    #         best_u_with_noise[0] = 73
+    #     if best_u_with_noise[1] > 373:
+    #         best_u_with_noise[1] = 373
+    #     elif best_u_with_noise[1] < 73:
+    #         best_u_with_noise[1] = 73
+    #     best_u_with_noise[0] = int(best_u_with_noise[0])
+    #     best_u_with_noise[1] = int(best_u_with_noise[1])
+    #
+    #         return best_u_with_noise
 
 
 def pickle_model(model, round_num):
