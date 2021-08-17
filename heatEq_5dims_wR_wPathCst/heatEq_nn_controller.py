@@ -321,7 +321,7 @@ def pickle_model(model, round_num):
 def train_and_pickle(round_num, trajectory_df_filename):
     print("Training with dataset: " + trajectory_df_filename)
     data = pd.read_csv(trajectory_df_filename)
-    simple_nn = HeatEqNNController(x_dim=20, x_rom_dim=3, u_dim=2)
+    simple_nn = HeatEqNNController(x_dim=20, x_rom_dim=5, u_dim=2)
     simple_nn.fit(data)
     pickle_filename = pickle_model(simple_nn, round_num)
     return pickle_filename
