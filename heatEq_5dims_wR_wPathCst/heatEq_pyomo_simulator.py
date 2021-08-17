@@ -760,7 +760,7 @@ def load_pickle(filename):
 def replay(trajectory_df_filename, buffer_capacity=360):
     # Use this to keep track where to push out old data
     forgotten_trajectories_count = 0
-    pickle_filename = "heatEq_nn_controller_3dim.pickle"
+    pickle_filename = "heatEq_nn_controller_5dim.pickle"
     og_trajectory_df_filename = trajectory_df_filename
 
     best_cost_after_n_rounds = {}
