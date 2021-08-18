@@ -267,7 +267,7 @@ class HeatEqNNController:
 
             # Configure options for the local minimizer (Powell)
             gd_options = {}
-            gd_options["maxiter"] = 5
+            # gd_options["maxiter"] = 5
             # gd_options["disp"] = True
             # gd_options["eps"] = 1
 
@@ -283,31 +283,12 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=5, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
-            # Add some noise to encourage exploration
-            u0_opt_with_noise = u_opt[0] + np.random.uniform(low=-2, high=2, size=None)
-            u1_opt_with_noise = u_opt[1] + np.random.uniform(low=-2, high=2, size=None)
-            best_u_with_noise = np.array((u0_opt_with_noise, u1_opt_with_noise)).flatten()
-            print("Best u given x = {} is {}, adding noise = {}"
-                  .format(x.flatten().round(4), u_opt.round(4), best_u_with_noise.round(4))
-                  )
 
-            # Make sure the noise doesn't go over bounds
-            if best_u_with_noise[0] > 473:
-                best_u_with_noise[0] = 473
-            elif best_u_with_noise[0] < 73:
-                best_u_with_noise[0] = 73
-            if best_u_with_noise[1] > 473:
-                best_u_with_noise[1] = 473
-            elif best_u_with_noise[1] < 73:
-                best_u_with_noise[1] = 73
-            best_u_with_noise[0] = int(best_u_with_noise[0])
-            best_u_with_noise[1] = int(best_u_with_noise[1])
-
-            return best_u_with_noise
+            return u_opt
 
 
 def pickle_model(model, round_num):
