@@ -258,7 +258,7 @@ class HeatEqNNController:
             # Configure options for the local minimizer (Powell)
             gd_options = {}
             gd_options["maxiter"] = 10
-            gd_options["disp"] = True
+            # gd_options["disp"] = True
             # gd_options["eps"] = 1
 
             # Specify bounds to send to the Powell minimizer
