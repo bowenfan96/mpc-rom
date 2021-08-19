@@ -22,7 +22,7 @@ from scipy import optimize
 
 import time as python_timer
 
-results_folder = "heatEq_replay_results/vertex05-moreExpl/"
+results_folder = "expReplay_results/edge09/"
 
 
 class xMOR(nn.Module):
@@ -257,7 +257,7 @@ class HeatEqNNController:
 
             # Configure options for the local minimizer (Powell)
             gd_options = {}
-            gd_options["maxiter"] = 2
+            gd_options["maxiter"] = 10
             gd_options["disp"] = True
             # gd_options["eps"] = 1
 
@@ -273,7 +273,7 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=5, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
