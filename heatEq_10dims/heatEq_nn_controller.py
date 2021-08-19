@@ -22,7 +22,7 @@ from scipy import optimize
 
 import time as python_timer
 
-results_folder = "expReplay_results/edge09/"
+results_folder = "expReplay_results/ray11/"
 
 
 class xMOR(nn.Module):

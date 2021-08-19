@@ -11,7 +11,7 @@ from pyomo.solvers import *
 
 from heatEq_nn_controller import *
 
-results_folder = "expReplay_results/edge09/"
+results_folder = "expReplay_results/ray11/"
 
 
 class HeatEqSimulator:
