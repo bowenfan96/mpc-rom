@@ -267,7 +267,7 @@ class HeatEqNNController:
 
             # Configure options for the local minimizer (Powell)
             gd_options = {}
-            # gd_options["maxiter"] = 5
+            gd_options["maxiter"] = 5
             # gd_options["disp"] = True
             # gd_options["eps"] = 1
 
@@ -283,7 +283,7 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=5, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
