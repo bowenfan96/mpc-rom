@@ -11,7 +11,7 @@ from pyomo.solvers import *
 
 from heatEq_nn_controller import *
 
-results_folder = "expReplay_results/vertex05/"
+results_folder = "expReplay_results/sprite10/"
 
 
 class HeatEqSimulator:
@@ -838,7 +838,7 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    replay("heatEq_240_trajectories_df.csv")
+    # replay("heatEq_240_trajectories_df.csv")
 
     # heatEq_system = HeatEqSimulator()
     # main_res, _ = heatEq_system.simulate_system_sindy_controls()
@@ -851,3 +851,23 @@ if __name__ == "__main__":
     # heatEq_sys.mpc_control()
     # main_res, _ = heatEq_sys.parse_mpc_results()
     # heatEq_sys.plot(main_res)
+
+
+    pickle_filename = "heatEq_nn_controller_240.pickle"
+    heatEq_nn = load_pickle(pickle_filename)
+    u0 = np.linspace(start=173, stop=175, num=200)
+    u1 = 273
+    x = np.full(shape=(20, ), fill_value=273)
+    ctg_plot = []
+    cst_plot = []
+    for u0_i in u0:
+        pred_ctg, pred_cst = heatEq_nn.predict_ctg_cst(x, [u0_i, u1])
+        ctg_plot.append(pred_ctg)
+        cst_plot.append(pred_cst)
+    plt.plot(u0, ctg_plot)
+    plt.xlabel("$u_0$")
+    plt.ylabel("Cost to go")
+    plt.title("Cost against $u_0$, at initial state of 273 K \n $u_1$ fixed at 273 K")
+    plt.annotate("Non-differentiable behaviour", (175, 4500))
+    plt.savefig("Non-differentiable behaviour.svg")
+    plt.show()

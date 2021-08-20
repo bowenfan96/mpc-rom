@@ -11,60 +11,28 @@ from pyomo.solvers import *
 
 from heatEq_nn_controller import *
 
-results_folder = "expReplay_results/edge09/"
+results_folder = "heatEq_replay_results/vertex05-moreExpl/"
+
+
+# THIN ROD WITH DIMENSIONALITY REDUCED FROM 20 TO 5
 
 
 class HeatEqSimulator:
-    def __init__(self, duration=1, N=20):
+    def __init__(self, duration=1):
         # Unique ID for savings csv and plots, based on model timestamp
         self.uid = datetime.datetime.now().strftime("%d-%H.%M.%S.%f")[:-3]
         print("Model uid", self.uid)
-
-        # ----- GENERATE THE MODEL MATRICES -----
-        # Apply the method of lines on the heat equation to generate the A matrix
-        # Length of the rod = 1 m
-        # Number of segments = number of discretization points - 1 (as 2 ends take up 2 points)
-        length = 1
-        num_segments = N - 1
-        # Thermal diffusivity alpha
-        alpha = 0.3
-        segment_length = length / num_segments
-        # Constant
-        c = alpha / (segment_length ** 2)
-
-        # Generate A matrix
-        A_mat = np.zeros(shape=(N, N))
-        for row in range(A_mat.shape[0]):
-            for col in range(A_mat.shape[1]):
-                if row == col:
-                    A_mat[row][col] = -2
-                elif abs(row - col) == 1:
-                    A_mat[row][col] = 1
-                else:
-                    A_mat[row][col] = 0
-        # Multiply constant to all elements in A
-        self.A = c * A_mat
-
-        # Generate B matrix
-        # Two sources of heat at each end of the rod
-        num_heaters = 2
-        B_mat = np.zeros(shape=(N, num_heaters))
-        # First heater on the left
-        B_mat[0][0] = 1
-        # Second heater on the right
-        B_mat[N - 1][num_heaters - 1] = 1
-        # Multiply constant to all elements in B
-        self.B = c * B_mat
 
         # ----- SET UP THE BASIC MODEL -----
         # Set up pyomo model structure
         self.model = ConcreteModel()
         self.model.time = ContinuousSet(bounds=(0, duration))
 
-        # Initial state: the rod is 273 Kelvins throughout
-        # Change this array if random initial states are desired
-        x_init = np.full(shape=(N, ), fill_value=273)
-        # x_init = np.random.randint(low=263, high=283, size=N)
+        # Initial state: the rod is 273 Kelvins throughout (all x_full = 273)
+        # Initial values for x_rom:
+        #      x0_rom    x1_rom    x2_rom    x3_rom    x4_rom
+        #   -0.203286 -0.271189  0.407007 -0.666588 -0.234218
+        x_init = [-38.80465, -4.298748, 65.039635, -147.96707, -52.63922]
 
         # NOTE: Pyomo can simulate via scipy/casadi only if:
         # 1. model.u is indexed only by time, so Bu using matrix multiplication is not possible
@@ -73,6 +41,7 @@ class HeatEqSimulator:
         # if we want pyomo to simulate with random controls
 
         # Set up all the finite elements
+
         self.model.x0 = Var(self.model.time)
         self.model.x0_dot = DerivativeVar(self.model.x0, wrt=self.model.time)
         self.model.x0[0].fix(x_init[0])
@@ -88,149 +57,39 @@ class HeatEqSimulator:
         self.model.x4 = Var(self.model.time)
         self.model.x4_dot = DerivativeVar(self.model.x4, wrt=self.model.time)
         self.model.x4[0].fix(x_init[4])
-        self.model.x5 = Var(self.model.time)
-        self.model.x5_dot = DerivativeVar(self.model.x5, wrt=self.model.time)
-        self.model.x5[0].fix(x_init[5])
-        self.model.x6 = Var(self.model.time)
-        self.model.x6_dot = DerivativeVar(self.model.x6, wrt=self.model.time)
-        self.model.x6[0].fix(x_init[6])
-        self.model.x7 = Var(self.model.time)
-        self.model.x7_dot = DerivativeVar(self.model.x7, wrt=self.model.time)
-        self.model.x7[0].fix(x_init[7])
-        self.model.x8 = Var(self.model.time)
-        self.model.x8_dot = DerivativeVar(self.model.x8, wrt=self.model.time)
-        self.model.x8[0].fix(x_init[8])
-        self.model.x9 = Var(self.model.time)
-        self.model.x9_dot = DerivativeVar(self.model.x9, wrt=self.model.time)
-        self.model.x9[0].fix(x_init[9])
-        self.model.x10 = Var(self.model.time)
-        self.model.x10_dot = DerivativeVar(self.model.x10, wrt=self.model.time)
-        self.model.x10[0].fix(x_init[10])
-        self.model.x11 = Var(self.model.time)
-        self.model.x11_dot = DerivativeVar(self.model.x11, wrt=self.model.time)
-        self.model.x11[0].fix(x_init[11])
-        self.model.x12 = Var(self.model.time)
-        self.model.x12_dot = DerivativeVar(self.model.x12, wrt=self.model.time)
-        self.model.x12[0].fix(x_init[12])
-        self.model.x13 = Var(self.model.time)
-        self.model.x13_dot = DerivativeVar(self.model.x13, wrt=self.model.time)
-        self.model.x13[0].fix(x_init[13])
-        self.model.x14 = Var(self.model.time)
-        self.model.x14_dot = DerivativeVar(self.model.x14, wrt=self.model.time)
-        self.model.x14[0].fix(x_init[14])
-        self.model.x15 = Var(self.model.time)
-        self.model.x15_dot = DerivativeVar(self.model.x15, wrt=self.model.time)
-        self.model.x15[0].fix(x_init[15])
-        self.model.x16 = Var(self.model.time)
-        self.model.x16_dot = DerivativeVar(self.model.x16, wrt=self.model.time)
-        self.model.x16[0].fix(x_init[16])
-        self.model.x17 = Var(self.model.time)
-        self.model.x17_dot = DerivativeVar(self.model.x17, wrt=self.model.time)
-        self.model.x17[0].fix(x_init[17])
-        self.model.x18 = Var(self.model.time)
-        self.model.x18_dot = DerivativeVar(self.model.x18, wrt=self.model.time)
-        self.model.x18[0].fix(x_init[18])
-        self.model.x19 = Var(self.model.time)
-        self.model.x19_dot = DerivativeVar(self.model.x19, wrt=self.model.time)
-        self.model.x19[0].fix(x_init[19])
 
         # Set up controls
-        self.model.u0 = Var(self.model.time, bounds=(173, 473))
-        self.model.u1 = Var(self.model.time, bounds=(173, 473))
+        self.model.u0 = Var(self.model.time, bounds=(173, 373))
+        self.model.u1 = Var(self.model.time, bounds=(173, 373))
 
-        sigma = -5.67e-8/2
-        env_temp = 273
+        # x0' = 7769149.7131 + -151255.558 x0 + -87800.330 x1 + -140319.799 x2 + 46491.535 x3 + -37807.701 x4 + -1.117 u0 + -1.100 u1
+        # x1' = 1122573.8321 + -21845.813 x0 + -12695.379 x1 + -20260.219 x2 + 6715.461 x3 + -5444.430 x4 + -0.139 u0 + -0.129 u1
+        # x2' = -5640898.6741 + 109818.855 x0 + 63750.531 x1 + 101878.377 x2 + -33754.750 x3 + 27445.793 x4 + 0.794 u0 + 0.783 u1
+        # x3' = 12490213.9981 + -243148.831 x0 + -141174.186 x1 + -225553.599 x2 + 74739.735 x3 + -60743.890 x4 + -1.783 u0 + -1.739 u1
+        # x4' = 2605548.1721 + -50715.154 x0 + -29456.870 x1 + -47041.362 x2 + 15588.982 x3 + -12656.697 x4 + -0.351 u0 + -0.343 u1
+
         # ODEs
+        # Set up x0_dot = Ax + Bu
         def _ode_x0(m, _t):
-            return m.x0_dot[_t] == self.A[0][0] * m.x0[_t] + self.A[0][1] * m.x1[_t] + self.B[0][0] * m.u0[_t] + sigma * (m.x0[_t] ** 4 - env_temp ** 4)
+            return m.x0_dot[_t] == 7769149.7131 + -151255.558 * self.model.x0[_t] + -87800.330 * self.model.x1[_t] + -140319.799 * self.model.x2[_t] + 46491.535 * self.model.x3[_t] + -37807.701 * self.model.x4[_t] + -11.17 * self.model.u0[_t] + -11.00 * self.model.u1[_t]
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         # Set up x1_dot to x18_dot = Ax only
         def _ode_x1(m, _t):
-            return m.x1_dot[_t] == self.A[1][1 - 1] * m.x0[_t] + self.A[1][1] * m.x1[_t] + self.A[1][1 + 1] * m.x2[_t] + sigma * (m.x1[_t] ** 4 - env_temp ** 4)
+            return m.x1_dot[_t] == 1122573.8321 + -21845.813 * self.model.x0[_t] + -12695.379 * self.model.x1[_t] + -20260.219 * self.model.x2[_t] + 6715.461 * self.model.x3[_t] + -5444.430 * self.model.x4[_t] + -1.39 * self.model.u0[_t] + -1.29 * self.model.u1[_t]
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
         def _ode_x2(m, _t):
-            return m.x2_dot[_t] == self.A[2][2 - 1] * m.x1[_t] + self.A[2][2] * m.x2[_t] + self.A[2][2 + 1] * m.x3[_t] + sigma * (m.x2[_t] ** 4 - env_temp ** 4)
+            return m.x2_dot[_t] == -5640898.6741 + 109818.855 * self.model.x0[_t] + 63750.531 * self.model.x1[_t] + 101878.377 * self.model.x2[_t] + -33754.750 * self.model.x3[_t] + 27445.793 * self.model.x4[_t] + 7.94 * self.model.u0[_t] + 7.83 * self.model.u1[_t]
         self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         def _ode_x3(m, _t):
-            return m.x3_dot[_t] == self.A[3][3 - 1] * m.x2[_t] + self.A[3][3] * m.x3[_t] + self.A[3][3 + 1] * m.x4[_t] + sigma * (m.x3[_t] ** 4 - env_temp ** 4)
+            return m.x3_dot[_t] == 12490213.9981 + -243148.831 * self.model.x0[_t] + -141174.186 * self.model.x1[_t] + -225553.599 * self.model.x2[_t] + 74739.735 * self.model.x3[_t] + -60743.890 * self.model.x4[_t] + -17.83 * self.model.u0[_t] + -17.39 * self.model.u1[_t]
         self.model.x3_ode = Constraint(self.model.time, rule=_ode_x3)
 
         def _ode_x4(m, _t):
-            return m.x4_dot[_t] == self.A[4][4 - 1] * m.x3[_t] + self.A[4][4] * m.x4[_t] + self.A[4][4 + 1] * m.x5[_t] + sigma * (m.x4[_t] ** 4 - env_temp ** 4)
+            return m.x4_dot[_t] == 2605548.1721 + -50715.154 * self.model.x0[_t] + -29456.870 * self.model.x1[_t] + -47041.362 * self.model.x2[_t] + 15588.982 * self.model.x3[_t] + -12656.697 * self.model.x4[_t] + -3.51 * self.model.u0[_t] + -3.43 * self.model.u1[_t]
         self.model.x4_ode = Constraint(self.model.time, rule=_ode_x4)
-
-        def _ode_x5(m, _t):
-            return m.x5_dot[_t] == self.A[5][5 - 1] * m.x4[_t] + self.A[5][5] * m.x5[_t] + self.A[5][5 + 1] * m.x6[_t] + sigma * (m.x5[_t] ** 4 - env_temp ** 4)
-        self.model.x5_ode = Constraint(self.model.time, rule=_ode_x5)
-
-        def _ode_x6(m, _t):
-            return m.x6_dot[_t] == self.A[6][6 - 1] * m.x5[_t] + self.A[6][6] * m.x6[_t] + self.A[6][6 + 1] * m.x7[_t] + sigma * (m.x6[_t] ** 4 - env_temp ** 4)
-        self.model.x6_ode = Constraint(self.model.time, rule=_ode_x6)
-
-        def _ode_x7(m, _t):
-            return m.x7_dot[_t] == self.A[7][7 - 1] * m.x6[_t] + self.A[7][7] * m.x7[_t] + self.A[7][7 + 1] * m.x8[_t] + sigma * (m.x7[_t] ** 4 - env_temp ** 4)
-        self.model.x7_ode = Constraint(self.model.time, rule=_ode_x7)
-
-        def _ode_x8(m, _t):
-            return m.x8_dot[_t] == self.A[8][8 - 1] * m.x7[_t] + self.A[8][8] * m.x8[_t] + self.A[8][8 + 1] * m.x9[_t] + sigma * (m.x8[_t] ** 4 - env_temp ** 4)
-        self.model.x8_ode = Constraint(self.model.time, rule=_ode_x8)
-
-        def _ode_x9(m, _t):
-            return m.x9_dot[_t] == self.A[9][9 - 1] * m.x8[_t] + self.A[9][9] * m.x9[_t] + self.A[9][9 + 1] * m.x10[_t] + sigma * (m.x9[_t] ** 4 - env_temp ** 4)
-        self.model.x9_ode = Constraint(self.model.time, rule=_ode_x9)
-
-        def _ode_x10(m, _t):
-            return m.x10_dot[_t] == self.A[10][10 - 1] * m.x9[_t] + self.A[10][10] * m.x10[_t] + self.A[10][10 + 1] * \
-                   m.x11[_t] + sigma * (m.x10[_t] ** 4 - env_temp ** 4)
-        self.model.x10_ode = Constraint(self.model.time, rule=_ode_x10)
-
-        def _ode_x11(m, _t):
-            return m.x11_dot[_t] == self.A[11][11 - 1] * m.x10[_t] + self.A[11][11] * m.x11[_t] + self.A[11][11 + 1] * \
-                   m.x12[_t] + sigma * (m.x11[_t] ** 4 - env_temp ** 4)
-        self.model.x11_ode = Constraint(self.model.time, rule=_ode_x11)
-
-        def _ode_x12(m, _t):
-            return m.x12_dot[_t] == self.A[12][12 - 1] * m.x11[_t] + self.A[12][12] * m.x12[_t] + self.A[12][12 + 1] * \
-                   m.x13[_t] + sigma * (m.x12[_t] ** 4 - env_temp ** 4)
-        self.model.x12_ode = Constraint(self.model.time, rule=_ode_x12)
-
-        def _ode_x13(m, _t):
-            return m.x13_dot[_t] == self.A[13][13 - 1] * m.x12[_t] + self.A[13][13] * m.x13[_t] + self.A[13][13 + 1] * \
-                   m.x14[_t] + sigma * (m.x13[_t] ** 4 - env_temp ** 4)
-        self.model.x13_ode = Constraint(self.model.time, rule=_ode_x13)
-
-        def _ode_x14(m, _t):
-            return m.x14_dot[_t] == self.A[14][14 - 1] * m.x13[_t] + self.A[14][14] * m.x14[_t] + self.A[14][14 + 1] * \
-                   m.x15[_t] + sigma * (m.x14[_t] ** 4 - env_temp ** 4)
-        self.model.x14_ode = Constraint(self.model.time, rule=_ode_x14)
-
-        def _ode_x15(m, _t):
-            return m.x15_dot[_t] == self.A[15][15 - 1] * m.x14[_t] + self.A[15][15] * m.x15[_t] + self.A[15][15 + 1] * \
-                   m.x16[_t] + sigma * (m.x15[_t] ** 4 - env_temp ** 4)
-        self.model.x15_ode = Constraint(self.model.time, rule=_ode_x15)
-
-        def _ode_x16(m, _t):
-            return m.x16_dot[_t] == self.A[16][16 - 1] * m.x15[_t] + self.A[16][16] * m.x16[_t] + self.A[16][16 + 1] * \
-                   m.x17[_t] + sigma * (m.x16[_t] ** 4 - env_temp ** 4)
-        self.model.x16_ode = Constraint(self.model.time, rule=_ode_x16)
-
-        def _ode_x17(m, _t):
-            return m.x17_dot[_t] == self.A[17][17 - 1] * m.x16[_t] + self.A[17][17] * m.x17[_t] + self.A[17][17 + 1] * \
-                   m.x18[_t] + sigma * (m.x17[_t] ** 4 - env_temp ** 4)
-        self.model.x17_ode = Constraint(self.model.time, rule=_ode_x17)
-
-        def _ode_x18(m, _t):
-            return m.x18_dot[_t] == self.A[18][18 - 1] * m.x17[_t] + self.A[18][18] * m.x18[_t] + self.A[18][18 + 1] * \
-                   m.x19[_t] + sigma * (m.x18[_t] ** 4 - env_temp ** 4)
-        self.model.x18_ode = Constraint(self.model.time, rule=_ode_x18)
-
-        # Set up x19_dot = Ax + Bu
-        def _ode_x19(m, _t):
-            return m.x19_dot[_t] == self.A[19][19] * m.x19[_t] + self.A[19][18] * m.x18[_t] + self.B[19][1] * m.u1[_t] + sigma * (m.x19[_t] ** 4 - env_temp ** 4)
-        self.model.x19_ode = Constraint(self.model.time, rule=_ode_x19)
 
         # Lagrangian cost
         self.model.L = Var(self.model.time)
@@ -250,8 +109,12 @@ class HeatEqSimulator:
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
-                   == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x13[_t] - 333) ** 2) \
-                   + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
+                   == setpoint_weight * ((m.x0[_t] - -85.02493) ** 2
+                                         + (m.x1[_t] - -18.394802) ** 2
+                                         + (m.x2[_t] - 100.83086) ** 2
+                                         + (m.x3[_t] - -235.56361) ** 2
+                                         + (m.x4[_t] - -75.54978) ** 2) \
+                   # + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
         # Objective function is to minimize the Lagrangian cost integral
@@ -259,11 +122,10 @@ class HeatEqSimulator:
             return m.L[m.time.last()] - m.L[0]
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
-        # Constraint for the element at the 1/3 position: path constraint for additional challenge
-        # 5t^2 + 10t + 293
-        def _constraint_x5(m, _t):
-            return m.x5[_t] <= (5 * _t ** 2) + (10 * _t) + 293
-        self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
+        # # Constraint for the element at the 1/3 position: temperature must not exceed 313 K (10 K above setpoint)
+        # def _constraint_x5(m, _t):
+        #     return m.x5[_t] <= 313
+        # self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form
@@ -279,8 +141,8 @@ class HeatEqSimulator:
 
     def mpc_control(self):
         mpc_solver = SolverFactory("ipopt", tee=True)
-        # mpc_solver.options['max_iter'] = 10000
         mpc_results = mpc_solver.solve(self.model)
+        self.model.display()
 
         return mpc_results
 
@@ -364,8 +226,8 @@ class HeatEqSimulator:
 
     def simulate_system_rng_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
-        u0_rng = np.random.uniform(low=173, high=473, size=11)
-        u1_rng = np.random.uniform(low=173, high=473, size=11)
+        u0_rng = np.random.uniform(low=173, high=373, size=11)
+        u1_rng = np.random.uniform(low=173, high=373, size=11)
 
         # Create a dictionary of piecewise linear controller actions
         u0_rng_profile = {timesteps[i]: u0_rng[i] for i in range(len(timesteps))}
@@ -423,8 +285,7 @@ class HeatEqSimulator:
             ctg[time] += ctg[time + 1]
 
         # Calculate path violations
-        # 5t^2 + 10t + 293
-        path = [x[5][int(time * 10)] - (5 * time ** 2 + 10 * time + 293) for time in t]
+        path = [x[5][int(time * 10)] - 313 for time in t]
         path_violation = []
         for p in path:
             if max(path) > 0:
@@ -531,8 +392,7 @@ class HeatEqSimulator:
             ctg[time] += ctg[time + 1]
 
         # Calculate path violations
-        # 5t^2 + 10t + 293
-        path = [x[5][int(time * 10)] - (5 * time ** 2 + 10 * time + 293) for time in t]
+        path = [x[5][int(time * 10)] - 313 for time in t]
         path_violation = []
         for p in path:
             if max(path) > 0:
@@ -554,95 +414,6 @@ class HeatEqSimulator:
         nn_sim_results_df_dropped_tf = nn_sim_results_df.drop(index=10)
 
         return nn_sim_results_df, nn_sim_results_df_dropped_tf
-
-    def simulate_system_sindy_controls(self):
-        timesteps = [timestep / 10 for timestep in range(11)]
-
-        u0_nn = [273, 173, 173, 173, 173, 173, 173, 173, 213.835, 241.622, 241.622]
-        u1_nn = [273, 248.855, 373, 373, 227.259, 220.155, 373, 373, 373, 373, 373]
-
-        self.model.var_input = Suffix(direction=Suffix.LOCAL)
-        # Create a dictionary of piecewise linear controller actions
-        u0_nn_profile = {timesteps[i]: u0_nn[i] for i in range(len(timesteps))}
-        u1_nn_profile = {timesteps[i]: u1_nn[i] for i in range(len(timesteps))}
-
-        # Update the control sequence to Pyomo
-        self.model.var_input[self.model.u0] = u0_nn_profile
-        self.model.var_input[self.model.u1] = u1_nn_profile
-
-        sim = Simulator(self.model, package="casadi")
-        tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
-
-        # For some reason both tsim and profiles contain duplicates
-        # Use pandas to drop the duplicates first
-        # profiles columns: x0, x1, ..., x19, L
-        temp_dict = {"t": tsim}
-        for j in range(20):
-            temp_dict["x{}".format(j)] = profiles[:, j]
-        temp_dict["L"] = profiles[:, 20]
-
-        deduplicate_df = pd.DataFrame(temp_dict)
-        deduplicate_df = deduplicate_df.round(4)
-        deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
-
-        # Make dataframe from the simulator results
-        t = deduplicate_df["t"]
-        x = []
-        for j in range(20):
-            x.append(deduplicate_df["x{}".format(j)])
-
-        # Note: at this point, x is a list of 20 pandas series, each series has 11 rows
-        # Check duplicates were removed correctly
-        assert len(t) == 11
-
-        # Make dataframe from the final simulator results
-        t = deduplicate_df["t"]
-        x = []
-        for i in range(20):
-            x.append(deduplicate_df["x{}".format(i)])
-        L = deduplicate_df["L"]
-        u0 = u0_nn
-        u1 = u1_nn
-        inst_cost = []
-        ctg = []
-
-        for time in range(len(t)):
-            # Instantaneous cost is L[t1] - L[t0]
-            if time == 10:
-                inst_cost.append(0)
-            else:
-                inst_cost.append(L[time + 1] - L[time])
-
-        # Calculate cost to go
-        for time in range(len(t)):
-            ctg.append(inst_cost[time])
-        # Sum backwards from tf
-        for time in reversed(range(len(t) - 1)):
-            ctg[time] += ctg[time + 1]
-
-        # Calculate path violations
-        path = [x[5][int(time * 10)] - 313 for time in t]
-        path_violation = []
-        for p in path:
-            if max(path) > 0:
-                path_violation.append(max(path))
-            else:
-                path_violation.append(p)
-
-        temp_dict = {"t": t}
-        for i in range(20):
-            temp_dict["x{}".format(i)] = x[i]
-        temp_dict["u0"] = u0
-        temp_dict["u1"] = u1
-        temp_dict["L"] = L
-        temp_dict["inst_cost"] = inst_cost
-        temp_dict["ctg"] = ctg
-        temp_dict["path_diff"] = path_violation
-
-        sindy_sim_results_df = pd.DataFrame(temp_dict)
-        sindy_sim_results_df_dropped_tf = sindy_sim_results_df.drop(index=10)
-
-        return sindy_sim_results_df, sindy_sim_results_df_dropped_tf
 
     def plot(self, dataframe, num_rounds=0, num_run_in_round=0):
         t = dataframe["t"]
@@ -670,38 +441,26 @@ class HeatEqSimulator:
         fig, axs = plt.subplots(3, constrained_layout=True)
         fig.set_size_inches(5, 10)
 
-        x5_path_cst = []
-        # 5t^2 + 10t + 293
-        for ts in t:
-            x5_path_cst.append((5 * ts ** 2) + (10 * ts) + 293)
-
         axs[0].plot(t, x5, label="$x_5$")
-        axs[0].plot(t, x5_path_cst, label="Path constraint for $x_5$")
-        axs[0].plot(t, np.full(shape=(t.size, ), fill_value=303), "--", label="Setpoint for $x_5$")
+        axs[0].plot(t, np.full(shape=(t.size, ), fill_value=313), label="Constraint for $x_5$")
         axs[0].legend()
 
         axs[1].plot(t, x13, label="$x_{13}$")
-        axs[1].plot(t, np.full(shape=(t.size,), fill_value=333), "--", label="Setpoint for $x_{13}$")
         axs[1].legend()
 
         axs[2].step(t, u0, label="$u_0$")
         axs[2].step(t, u1, label="$u_1$")
         axs[2].legend()
 
-        # fig.suptitle("Control policy and system state after {} rounds of training \n "
-        #              "Run {}: Cost = {}, Constraint = {}"
-        #              .format(num_rounds, num_run_in_round, total_cost, cst_status))
-        # plt.xlabel("Time")
-
-        fig.suptitle("MPC Controller: Cost achieved = {}\n"
-                     "Heat Equation with path constraint and radiative loss".format(total_cost))
+        fig.suptitle("Control policy and system state after {} rounds of training \n "
+                     "Run {}: Cost = {}, Constraint = {}"
+                     .format(num_rounds, num_run_in_round, total_cost, cst_status))
         plt.xlabel("Time")
 
         # Save plot with autogenerated filename
-        svg_filename = results_folder + "svgs/" + "Round {} Run {} Cost {} Constraint {}"\
+        svg_filename = results_folder + "Round {} Run {} Cost {} Constraint {}"\
             .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
-        # plt.savefig(fname=svg_filename, format="svg")
-        plt.savefig(fname="MPC.svg", format="svg")
+        plt.savefig(fname=svg_filename, format="svg")
 
         # plt.show()
         plt.close()
@@ -765,7 +524,7 @@ def load_pickle(filename):
 def replay(trajectory_df_filename, buffer_capacity=360):
     # Use this to keep track where to push out old data
     forgotten_trajectories_count = 0
-    pickle_filename = "heatEq_nn_controller_3dim.pickle"
+    pickle_filename = "heatEq_nn_controller_240.pickle"
     og_trajectory_df_filename = trajectory_df_filename
 
     best_cost_after_n_rounds = {}
@@ -855,14 +614,7 @@ if __name__ == "__main__":
 
     # replay("heatEq_240_trajectories_df.csv")
 
-    # heatEq_system = HeatEqSimulator()
-    # main_res, _ = heatEq_system.simulate_system_sindy_controls()
-    # heatEq_system.plot(main_res)
-    # pd.set_option('display.max_columns', None)
-    # print(main_res)
-    # main_res.to_csv("heatEq_mpc_trajectory.csv")
-
     heatEq_system = HeatEqSimulator()
-    heatEq_system.mpc_control()
-    main_res, _ = heatEq_system.parse_mpc_results()
-    heatEq_system.plot(main_res)
+    print(heatEq_system.mpc_control())
+    # main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system.plot(main_res)

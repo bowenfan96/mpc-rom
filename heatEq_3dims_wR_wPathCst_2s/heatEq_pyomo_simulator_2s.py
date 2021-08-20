@@ -534,12 +534,12 @@ if __name__ == "__main__":
         main_nn_model = load_pickle("best_R42_heatEq_nn_controller.pickle")
         main_res, _ = main_simple_sys.simulate_system_nn_controls(main_nn_model)
         cst = main_res["path_diff"]
-        if cst.max() <= 0:
-            cst_status = "Pass"
-            main_simple_sys.plot(main_res)
-            print(main_res)
-            main_res.to_csv("NN_controller_2s.csv")
-            break
+        # if cst.max() <= 0:
+        #     cst_status = "Pass"
+        main_simple_sys.plot(main_res)
+        print(main_res)
+        # main_res.to_csv("NN_controller_2s.csv")
+        break
 
     # heatEq_system = HeatEqSimulator()
     # heatEq_system.mpc_control()
