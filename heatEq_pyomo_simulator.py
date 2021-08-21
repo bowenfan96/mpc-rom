@@ -9,9 +9,7 @@ from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
 
-from heatEq_nn_controller import *
-
-results_folder = "expReplay_results/point07_12nodes_h1ctg/"
+results_folder = ""
 
 
 class HeatEqSimulator:
@@ -63,7 +61,7 @@ class HeatEqSimulator:
 
         # Initial state: the rod is 273 Kelvins throughout
         # Change this array if random initial states are desired
-        x_init = np.full(shape=(N, ), fill_value=273)
+        x_init = np.full(shape=(N,), fill_value=273)
         # x_init = np.random.randint(low=263, high=283, size=N)
 
         # NOTE: Pyomo can simulate via scipy/casadi only if:
@@ -142,93 +140,113 @@ class HeatEqSimulator:
         # Set up x0_dot = Ax + Bu
         def _ode_x0(m, _t):
             return m.x0_dot[_t] == self.A[0][0] * m.x0[_t] + self.A[0][1] * m.x1[_t] + self.B[0][0] * m.u0[_t]
+
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         # Set up x1_dot to x18_dot = Ax only
         def _ode_x1(m, _t):
             return m.x1_dot[_t] == self.A[1][1 - 1] * m.x0[_t] + self.A[1][1] * m.x1[_t] + self.A[1][1 + 1] * m.x2[_t]
+
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
         def _ode_x2(m, _t):
             return m.x2_dot[_t] == self.A[2][2 - 1] * m.x1[_t] + self.A[2][2] * m.x2[_t] + self.A[2][2 + 1] * m.x3[_t]
+
         self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         def _ode_x3(m, _t):
             return m.x3_dot[_t] == self.A[3][3 - 1] * m.x2[_t] + self.A[3][3] * m.x3[_t] + self.A[3][3 + 1] * m.x4[_t]
+
         self.model.x3_ode = Constraint(self.model.time, rule=_ode_x3)
 
         def _ode_x4(m, _t):
             return m.x4_dot[_t] == self.A[4][4 - 1] * m.x3[_t] + self.A[4][4] * m.x4[_t] + self.A[4][4 + 1] * m.x5[_t]
+
         self.model.x4_ode = Constraint(self.model.time, rule=_ode_x4)
 
         def _ode_x5(m, _t):
             return m.x5_dot[_t] == self.A[5][5 - 1] * m.x4[_t] + self.A[5][5] * m.x5[_t] + self.A[5][5 + 1] * m.x6[_t]
+
         self.model.x5_ode = Constraint(self.model.time, rule=_ode_x5)
 
         def _ode_x6(m, _t):
             return m.x6_dot[_t] == self.A[6][6 - 1] * m.x5[_t] + self.A[6][6] * m.x6[_t] + self.A[6][6 + 1] * m.x7[_t]
+
         self.model.x6_ode = Constraint(self.model.time, rule=_ode_x6)
 
         def _ode_x7(m, _t):
             return m.x7_dot[_t] == self.A[7][7 - 1] * m.x6[_t] + self.A[7][7] * m.x7[_t] + self.A[7][7 + 1] * m.x8[_t]
+
         self.model.x7_ode = Constraint(self.model.time, rule=_ode_x7)
 
         def _ode_x8(m, _t):
             return m.x8_dot[_t] == self.A[8][8 - 1] * m.x7[_t] + self.A[8][8] * m.x8[_t] + self.A[8][8 + 1] * m.x9[_t]
+
         self.model.x8_ode = Constraint(self.model.time, rule=_ode_x8)
 
         def _ode_x9(m, _t):
             return m.x9_dot[_t] == self.A[9][9 - 1] * m.x8[_t] + self.A[9][9] * m.x9[_t] + self.A[9][9 + 1] * m.x10[_t]
+
         self.model.x9_ode = Constraint(self.model.time, rule=_ode_x9)
 
         def _ode_x10(m, _t):
             return m.x10_dot[_t] == self.A[10][10 - 1] * m.x9[_t] + self.A[10][10] * m.x10[_t] + self.A[10][10 + 1] * \
                    m.x11[_t]
+
         self.model.x10_ode = Constraint(self.model.time, rule=_ode_x10)
 
         def _ode_x11(m, _t):
             return m.x11_dot[_t] == self.A[11][11 - 1] * m.x10[_t] + self.A[11][11] * m.x11[_t] + self.A[11][11 + 1] * \
                    m.x12[_t]
+
         self.model.x11_ode = Constraint(self.model.time, rule=_ode_x11)
 
         def _ode_x12(m, _t):
             return m.x12_dot[_t] == self.A[12][12 - 1] * m.x11[_t] + self.A[12][12] * m.x12[_t] + self.A[12][12 + 1] * \
                    m.x13[_t]
+
         self.model.x12_ode = Constraint(self.model.time, rule=_ode_x12)
 
         def _ode_x13(m, _t):
             return m.x13_dot[_t] == self.A[13][13 - 1] * m.x12[_t] + self.A[13][13] * m.x13[_t] + self.A[13][13 + 1] * \
                    m.x14[_t]
+
         self.model.x13_ode = Constraint(self.model.time, rule=_ode_x13)
 
         def _ode_x14(m, _t):
             return m.x14_dot[_t] == self.A[14][14 - 1] * m.x13[_t] + self.A[14][14] * m.x14[_t] + self.A[14][14 + 1] * \
                    m.x15[_t]
+
         self.model.x14_ode = Constraint(self.model.time, rule=_ode_x14)
 
         def _ode_x15(m, _t):
             return m.x15_dot[_t] == self.A[15][15 - 1] * m.x14[_t] + self.A[15][15] * m.x15[_t] + self.A[15][15 + 1] * \
                    m.x16[_t]
+
         self.model.x15_ode = Constraint(self.model.time, rule=_ode_x15)
 
         def _ode_x16(m, _t):
             return m.x16_dot[_t] == self.A[16][16 - 1] * m.x15[_t] + self.A[16][16] * m.x16[_t] + self.A[16][16 + 1] * \
                    m.x17[_t]
+
         self.model.x16_ode = Constraint(self.model.time, rule=_ode_x16)
 
         def _ode_x17(m, _t):
             return m.x17_dot[_t] == self.A[17][17 - 1] * m.x16[_t] + self.A[17][17] * m.x17[_t] + self.A[17][17 + 1] * \
                    m.x18[_t]
+
         self.model.x17_ode = Constraint(self.model.time, rule=_ode_x17)
 
         def _ode_x18(m, _t):
             return m.x18_dot[_t] == self.A[18][18 - 1] * m.x17[_t] + self.A[18][18] * m.x18[_t] + self.A[18][18 + 1] * \
                    m.x19[_t]
+
         self.model.x18_ode = Constraint(self.model.time, rule=_ode_x18)
 
         # Set up x19_dot = Ax + Bu
         def _ode_x19(m, _t):
             return m.x19_dot[_t] == self.A[19][19] * m.x19[_t] + self.A[19][18] * m.x18[_t] + self.B[19][1] * m.u1[_t]
+
         self.model.x19_ode = Constraint(self.model.time, rule=_ode_x19)
 
         # Lagrangian cost
@@ -251,16 +269,19 @@ class HeatEqSimulator:
             return m.L_dot[_t] \
                    == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x13[_t] - 333) ** 2) \
                    + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
+
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
         # Objective function is to minimize the Lagrangian cost integral
         def _objective(m):
             return m.L[m.time.last()] - m.L[0]
+
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
         # Constraint for the element at the 1/3 position: temperature must not exceed 313 K (10 K above setpoint)
         def _constraint_x5(m, _t):
             return m.x5[_t] <= 313
+
         self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
@@ -334,7 +355,7 @@ class HeatEqSimulator:
             if time == 0:
                 inst_cost.append(0)
             else:
-                inst_cost.append(L[time] - L[time-1])
+                inst_cost.append(L[time] - L[time - 1])
 
         # Calculate cost to go
         for time in range(len(t)):
@@ -361,8 +382,30 @@ class HeatEqSimulator:
 
     def simulate_system_rng_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
-        u0_rng = np.random.uniform(low=173, high=373, size=11)
-        u1_rng = np.random.uniform(low=173, high=373, size=11)
+        u0_rng = [
+                  373,
+                  360.2492412,
+                  296.1008372,
+                  294.5995899,
+                  286.5524599,
+                  283.5063943,
+                  281.7249347,
+                  281.0282384,
+                  279.6974883,
+                  275.8649638,
+        275.8649638]
+        u1_rng = [
+                  373,
+                  373,
+                  373,
+                  373,
+                  373,
+                  373,
+                  373,
+                  372.7735169,
+                  362.835462,
+                  296.7658734,
+        296.7658734]
 
         # Create a dictionary of piecewise linear controller actions
         u0_rng_profile = {timesteps[i]: u0_rng[i] for i in range(len(timesteps))}
@@ -443,201 +486,6 @@ class HeatEqSimulator:
 
         return rng_sim_results_df, rng_sim_results_df_dropped_tf
 
-    def simulate_system_nn_controls(self, nn_model):
-        timesteps = [timestep / 10 for timestep in range(11)]
-        u0_nn = np.zeros(11)
-        u1_nn = np.zeros(11)
-        # Initial x values to be passed to the neural net at the first loop
-        current_x = np.full(shape=(20, ), fill_value=273)
-
-        self.model.var_input = Suffix(direction=Suffix.LOCAL)
-
-        # Pyomo does not support simulating step by step, so we need to run 11 simulation loops
-        # At loop i, we get state x_i and discard subsequent states
-        # We call the neural net to predict the optimal u for x_i, then fix u time i
-        for i in range(11):
-            # Fetch optimal action, u, by calling the neural net with current_x
-            u_opt = nn_model.get_u_opt(current_x)
-
-            # Replace the control sequence of the current timestep with u_opt
-            u0_nn[i] = u_opt[0]
-            u1_nn[i] = u_opt[1]
-
-            # Create a dictionary of piecewise linear controller actions
-            u0_nn_profile = {timesteps[i]: u0_nn[i] for i in range(len(timesteps))}
-            u1_nn_profile = {timesteps[i]: u1_nn[i] for i in range(len(timesteps))}
-
-            # Update the control sequence to Pyomo
-            self.model.var_input[self.model.u0] = u0_nn_profile
-            self.model.var_input[self.model.u1] = u1_nn_profile
-
-            sim = Simulator(self.model, package="casadi")
-            tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
-
-            # For some reason both tsim and profiles contain duplicates
-            # Use pandas to drop the duplicates first
-            # profiles columns: x0, x1, ..., x19, L
-            temp_dict = {"t": tsim}
-            for j in range(20):
-                temp_dict["x{}".format(j)] = profiles[:, j]
-            temp_dict["L"] = profiles[:, 20]
-
-            deduplicate_df = pd.DataFrame(temp_dict)
-            deduplicate_df = deduplicate_df.round(4)
-            deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
-
-            # Make dataframe from the simulator results
-            t = deduplicate_df["t"]
-            x = []
-            for j in range(20):
-                x.append(deduplicate_df["x{}".format(j)])
-
-            # Note: at this point, x is a list of 20 pandas series, each series has 11 rows
-            # Check duplicates were removed correctly
-            assert len(t) == 11
-
-            # Update current_x to the next state output by the simulator
-            if i < 10:
-                for j in range(20):
-                    current_x[j] = x[j][i+1]
-
-        # Make dataframe from the final simulator results
-        t = deduplicate_df["t"]
-        x = []
-        for i in range(20):
-            x.append(deduplicate_df["x{}".format(i)])
-        L = deduplicate_df["L"]
-        u0 = u0_nn
-        u1 = u1_nn
-        inst_cost = []
-        ctg = []
-
-        for time in range(len(t)):
-            # Instantaneous cost is L[t1] - L[t0]
-            if time == 10:
-                inst_cost.append(0)
-            else:
-                inst_cost.append(L[time + 1] - L[time])
-
-        # Calculate cost to go
-        for time in range(len(t)):
-            ctg.append(inst_cost[time])
-        # Sum backwards from tf
-        for time in reversed(range(len(t) - 1)):
-            ctg[time] += ctg[time + 1]
-
-        # Calculate path violations
-        path = [x[5][int(time * 10)] - 313 for time in t]
-        path_violation = []
-        for p in path:
-            if max(path) > 0:
-                path_violation.append(max(path))
-            else:
-                path_violation.append(p)
-
-        temp_dict = {"t": t}
-        for i in range(20):
-            temp_dict["x{}".format(i)] = x[i]
-        temp_dict["u0"] = u0
-        temp_dict["u1"] = u1
-        temp_dict["L"] = L
-        temp_dict["inst_cost"] = inst_cost
-        temp_dict["ctg"] = ctg
-        temp_dict["path_diff"] = path_violation
-
-        nn_sim_results_df = pd.DataFrame(temp_dict)
-        nn_sim_results_df_dropped_tf = nn_sim_results_df.drop(index=10)
-
-        return nn_sim_results_df, nn_sim_results_df_dropped_tf
-
-    def simulate_system_sindy_controls(self):
-        timesteps = [timestep / 10 for timestep in range(11)]
-
-        u0_nn = [273, 173, 173, 173, 173, 173, 173, 173, 213.835, 241.622, 241.622]
-        u1_nn = [273, 248.855, 373, 373, 227.259, 220.155, 373, 373, 373, 373, 373]
-
-        self.model.var_input = Suffix(direction=Suffix.LOCAL)
-        # Create a dictionary of piecewise linear controller actions
-        u0_nn_profile = {timesteps[i]: u0_nn[i] for i in range(len(timesteps))}
-        u1_nn_profile = {timesteps[i]: u1_nn[i] for i in range(len(timesteps))}
-
-        # Update the control sequence to Pyomo
-        self.model.var_input[self.model.u0] = u0_nn_profile
-        self.model.var_input[self.model.u1] = u1_nn_profile
-
-        sim = Simulator(self.model, package="casadi")
-        tsim, profiles = sim.simulate(numpoints=11, varying_inputs=self.model.var_input)
-
-        # For some reason both tsim and profiles contain duplicates
-        # Use pandas to drop the duplicates first
-        # profiles columns: x0, x1, ..., x19, L
-        temp_dict = {"t": tsim}
-        for j in range(20):
-            temp_dict["x{}".format(j)] = profiles[:, j]
-        temp_dict["L"] = profiles[:, 20]
-
-        deduplicate_df = pd.DataFrame(temp_dict)
-        deduplicate_df = deduplicate_df.round(4)
-        deduplicate_df.drop_duplicates(ignore_index=True, inplace=True)
-
-        # Make dataframe from the simulator results
-        t = deduplicate_df["t"]
-        x = []
-        for j in range(20):
-            x.append(deduplicate_df["x{}".format(j)])
-
-        # Note: at this point, x is a list of 20 pandas series, each series has 11 rows
-        # Check duplicates were removed correctly
-        assert len(t) == 11
-
-        # Make dataframe from the final simulator results
-        t = deduplicate_df["t"]
-        x = []
-        for i in range(20):
-            x.append(deduplicate_df["x{}".format(i)])
-        L = deduplicate_df["L"]
-        u0 = u0_nn
-        u1 = u1_nn
-        inst_cost = []
-        ctg = []
-
-        for time in range(len(t)):
-            # Instantaneous cost is L[t1] - L[t0]
-            if time == 10:
-                inst_cost.append(0)
-            else:
-                inst_cost.append(L[time + 1] - L[time])
-
-        # Calculate cost to go
-        for time in range(len(t)):
-            ctg.append(inst_cost[time])
-        # Sum backwards from tf
-        for time in reversed(range(len(t) - 1)):
-            ctg[time] += ctg[time + 1]
-
-        # Calculate path violations
-        path = [x[5][int(time * 10)] - 313 for time in t]
-        path_violation = []
-        for p in path:
-            if max(path) > 0:
-                path_violation.append(max(path))
-            else:
-                path_violation.append(p)
-
-        temp_dict = {"t": t}
-        for i in range(20):
-            temp_dict["x{}".format(i)] = x[i]
-        temp_dict["u0"] = u0
-        temp_dict["u1"] = u1
-        temp_dict["L"] = L
-        temp_dict["inst_cost"] = inst_cost
-        temp_dict["ctg"] = ctg
-        temp_dict["path_diff"] = path_violation
-
-        sindy_sim_results_df = pd.DataFrame(temp_dict)
-        sindy_sim_results_df_dropped_tf = sindy_sim_results_df.drop(index=10)
-
-        return sindy_sim_results_df, sindy_sim_results_df_dropped_tf
 
     def plot(self, dataframe, num_rounds=0, num_run_in_round=0):
         t = dataframe["t"]
@@ -666,16 +514,16 @@ class HeatEqSimulator:
         fig.set_size_inches(5, 10)
 
         axs[0].plot(t, x5, label="$x_5$")
-        axs[0].plot(t, np.full(shape=(t.size, ), fill_value=313), label="Constraint for $x_5$")
-        axs[0].plot(t, np.full(shape=(t.size, ), fill_value=303), "--", label="Setpoint for $x_5$")
+        axs[0].plot(t, np.full(shape=(t.size,), fill_value=313), label="Constraint for $x_5$")
+        axs[0].plot(t, np.full(shape=(t.size,), fill_value=303), "--", label="Setpoint for $x_5$")
         axs[0].legend()
 
         axs[1].plot(t, x13, label="$x_{13}$")
         axs[1].plot(t, np.full(shape=(t.size,), fill_value=333), "--", label="Setpoint for $x_{13}$")
         axs[1].legend()
 
-        axs[2].step(t, u0, label="$u_0$")
-        axs[2].step(t, u1, label="$u_1$")
+        axs[2].step(t, u0, label="$u_0$", where="post")
+        axs[2].step(t, u1, label="$u_1$", where="post")
         axs[2].legend()
 
         # fig.suptitle("Control policy and system state after {} rounds of training \n "
@@ -683,155 +531,19 @@ class HeatEqSimulator:
         #              .format(num_rounds, num_run_in_round, total_cost, cst_status))
         # plt.xlabel("Time")
 
-        fig.suptitle("MPC Controller: Cost achieved = {}\n"
-                     "Heat Equation with line constraint".format(total_cost))
+        fig.suptitle("BPOD MPC Controls: Cost achieved = {}\n"
+                     "System simulated with BPOD controls".format(total_cost))
         plt.xlabel("Time")
 
         # Save plot with autogenerated filename
-        svg_filename = results_folder + "svgs/" + "Round {} Run {} Cost {} Constraint {}"\
+        svg_filename = results_folder + "svgs/" + "Round {} Run {} Cost {} Constraint {}" \
             .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
         # plt.savefig(fname=svg_filename, format="svg")
-        # plt.savefig(fname="MPC.svg", format="svg")
+        plt.savefig(fname="BPOD_controls_accountForOutputError.svg", format="svg")
 
         plt.show()
         # plt.close()
         return
-
-
-def generate_trajectories(save_csv=False):
-    df_cols = ["t"]
-    for i in range(20):
-        df_cols.append("x{}".format(i))
-    df_cols.extend(["u0", "u1", "L", "inst_cost", "ctg", "path_diff"])
-    # 180 trajectories which obeyed the path constraint
-    obey_path_df = pd.DataFrame(columns=df_cols)
-    # 60 trajectories which violated the path constraint
-    violate_path_df = pd.DataFrame(columns=df_cols)
-    simple_60_trajectories_df = pd.DataFrame(columns=df_cols)
-
-    num_samples = 0
-    num_good = 0
-    num_bad = 0
-
-    while num_samples < 240:
-
-        while num_good < 3:
-            heatEq_sys = HeatEqSimulator()
-            _, trajectory = heatEq_sys.simulate_system_rng_controls()
-            if trajectory["path_diff"].max() <= 0:
-                simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
-                obey_path_df = pd.concat([obey_path_df, trajectory])
-                num_good += 1
-                num_samples += 1
-
-        while num_bad < 1:
-            heatEq_sys = HeatEqSimulator()
-            _, trajectory = heatEq_sys.simulate_system_rng_controls()
-            if trajectory["path_diff"].max() > 0:
-                simple_60_trajectories_df = pd.concat([simple_60_trajectories_df, trajectory])
-                violate_path_df = pd.concat([violate_path_df, trajectory])
-                num_bad += 1
-                num_samples += 1
-
-        # Reset
-        num_good = 0
-        num_bad = 0
-
-        print("Samples: ", num_samples)
-
-    if save_csv:
-        simple_60_trajectories_df.to_csv("heatEq_240_trajectories_df.csv")
-        obey_path_df.to_csv("heatEq_obey_path_df.csv")
-        violate_path_df.to_csv("heatEq_violate_path_df.csv")
-
-
-def load_pickle(filename):
-    with open(filename, "rb") as model:
-        pickled_nn_model = pickle.load(model)
-    print("Pickle loaded: " + filename)
-    return pickled_nn_model
-
-
-def replay(trajectory_df_filename, buffer_capacity=360):
-    # Use this to keep track where to push out old data
-    forgotten_trajectories_count = 0
-    pickle_filename = "heatEq_nn_controller_5dim.pickle"
-    og_trajectory_df_filename = trajectory_df_filename
-
-    best_cost_after_n_rounds = {}
-
-    for rp_round in range(90):
-        trajectory_df = pd.read_csv(results_folder + trajectory_df_filename, sep=",")
-        nn_model = load_pickle(pickle_filename)
-        run_trajectories = []
-
-        best_cost_in_round = np.inf
-
-        for run in range(6):
-            simple_sys = HeatEqSimulator()
-            df_1s, df_point9s = simple_sys.simulate_system_nn_controls(nn_model)
-
-            # Store the best result of this run if it passes constraints
-            run_cost = df_1s["ctg"][0]
-            run_constraint = df_1s["path_diff"].max()
-            if run_cost < best_cost_in_round and run_constraint <= 0:
-                best_cost_in_round = run_cost
-
-            simple_sys.plot(df_1s, num_rounds=rp_round+1, num_run_in_round=run+1)
-            run_trajectories.append(df_point9s)
-
-        # Decide whether to push out old memories
-        if trajectory_df.shape[0] >= buffer_capacity * 10:
-            # Get replace the 6 oldest trajectories with new data (60 rows at a time)
-            forgotten_trajectories_count = forgotten_trajectories_count % buffer_capacity
-            row_slice_start = forgotten_trajectories_count * 10
-            row_slice_end = row_slice_start + 60
-
-            df_temp_concat = pd.DataFrame(columns=trajectory_df.columns.tolist())
-            for df_temp in run_trajectories:
-                df_temp_concat = pd.concat([df_temp_concat, df_temp])
-
-            trajectory_df.iloc[row_slice_start:row_slice_end] = df_temp_concat.iloc[0:60]
-            print(trajectory_df)
-            forgotten_trajectories_count += 6
-
-        else:
-            for df_temp in run_trajectories:
-                trajectory_df = pd.concat([trajectory_df, df_temp])
-
-        trajectory_df_filename = "R{} ".format(rp_round+1) + og_trajectory_df_filename
-        trajectory_df.to_csv(results_folder + trajectory_df_filename)
-        pickle_filename = train_and_pickle(rp_round, results_folder + trajectory_df_filename)
-
-        # If best cost in round is better than current running best cost, add it to dictionary
-        if len(best_cost_after_n_rounds) == 0:
-            best_cost_after_n_rounds[rp_round] = best_cost_in_round
-        else:
-            best_key = min(best_cost_after_n_rounds, key=best_cost_after_n_rounds.get)
-            if best_cost_in_round < best_cost_after_n_rounds[best_key]:
-                best_cost_after_n_rounds[rp_round] = best_cost_in_round
-            else:
-                best_cost_after_n_rounds[rp_round] = best_cost_after_n_rounds[best_key]
-
-        # Plot best cost against rounds
-        # Unindent it to plot once, plotting every round and savings just in case anything fails
-        plt.plot(*zip(*sorted(best_cost_after_n_rounds.items())))
-        plt.title("Best cost obtained after each round")
-        plt.xlabel("Number of rounds")
-        plt.ylabel("Best cost obtained")
-        plot_filename = results_folder + "best_cost_plot.svg"
-        plt.savefig(fname=plot_filename, format="svg")
-        # plt.show()
-        plt.close()
-
-        # Save the best cost against rounds as a csv
-        best_cost_csv_filename = results_folder + "best_cost_plot.csv"
-        with open(best_cost_csv_filename, "w") as csv_file:
-            writer = csv.writer(csv_file)
-            for k, v in best_cost_after_n_rounds.items():
-                writer.writerow([k, v])
-
-    return
 
 
 if __name__ == "__main__":
@@ -852,8 +564,13 @@ if __name__ == "__main__":
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
-    heatEq_system = HeatEqSimulator()
-    heatEq_system.mpc_control()
-    main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system = HeatEqSimulator()
+    # heatEq_system.mpc_control()
+    # main_res, _ = heatEq_system.parse_mpc_results()
     # main_res.to_csv("FOM_results.csv")
+    # heatEq_system.plot(main_res)
+
+    heatEq_system = HeatEqSimulator()
+    main_res, _ = heatEq_system.simulate_system_rng_controls()
+    print(main_res)
     heatEq_system.plot(main_res)

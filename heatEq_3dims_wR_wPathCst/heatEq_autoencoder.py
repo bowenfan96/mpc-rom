@@ -82,7 +82,7 @@ class Decoder(nn.Module):
 
 
 class Autoencoder:
-    def __init__(self, x_dim, x_rom_dim=10):
+    def __init__(self, x_dim, x_rom_dim=3):
         self.encoder = Encoder(x_dim, x_rom_dim)
         self.decoder = Decoder(x_dim, x_rom_dim)
 
@@ -119,7 +119,7 @@ class Autoencoder:
         self.encoder.train()
         self.decoder.train()
 
-        mb_loader = torch.utils.data.DataLoader(x, batch_size=120, shuffle=False)
+        mb_loader = torch.utils.data.DataLoader(x, batch_size=200, shuffle=True)
 
         param_wrapper = nn.ParameterList()
         param_wrapper.extend(self.encoder.parameters())
@@ -266,11 +266,11 @@ def discover_objectives(ae_model):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("data/heatEq_240_trajectories_df.csv")
-    autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
+    data = pd.read_csv("data/autoencoder_training_data.csv")
+    autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
     autoencoder.fit(data)
-    # with open("heatEq_autoencoder_10dim.pickle", "wb") as model:
-    #     pickle.dump(autoencoder, model)
+    with open("heatEq_autoencoder_3dim.pickle", "wb") as model:
+        pickle.dump(autoencoder, model)
 
 
     # Get x_rom initial values
