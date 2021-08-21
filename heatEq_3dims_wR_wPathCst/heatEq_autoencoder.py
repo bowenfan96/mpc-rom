@@ -23,9 +23,9 @@ from scipy import optimize
 class Encoder(nn.Module):
     def __init__(self, x_dim, x_rom_dim):
         super(Encoder, self).__init__()
-        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
-        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
-        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)
+        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)     # max(3, 23//2) = 11
+        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)     # max(3, 23//2) = 11
+        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)     # max(3, 23//4) = 5
 
         self.input = nn.Linear(x_dim, h1_nodes)
         self.h1 = nn.Linear(h1_nodes, h2_nodes)
@@ -54,9 +54,9 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, x_dim, x_rom_dim):
         super(Decoder, self).__init__()
-        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)
-        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
-        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
+        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)     # max(3, 23//4) = 5
+        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)     # max(3, 23//2) = 11
+        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)     # max(3, 23//2) = 11
 
         self.input = nn.Linear(x_rom_dim, h1_nodes)
         self.h1 = nn.Linear(h1_nodes, h2_nodes)
@@ -147,7 +147,8 @@ class Autoencoder:
                 x_full_pred = self.decoder(x_rom)
                 loss = criterion(x_full_pred, x_test)
                 mae = metrics.mean_absolute_error(x_full_pred, x_test)
-                print("Held out test dataset - Epoch {}: MSE = {}, MAE = {}".format(epoch, loss, mae))
+                mape = metrics.mean_absolute_percentage_error(x_full_pred, x_test)
+                print("Held out test dataset - Epoch {}: MSE = {}, MAE = {}, MAPE = {}".format(epoch, loss, mae, mape))
             self.encoder.train()
             self.decoder.train()
 
@@ -276,8 +277,8 @@ if __name__ == "__main__":
     test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
     autoencoder.fit(data, test_data)
-    # with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
-    #     pickle.dump(autoencoder, model)
+    with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
+        pickle.dump(autoencoder, model)
 
 
     # Get x_rom initial values
