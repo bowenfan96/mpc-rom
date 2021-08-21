@@ -138,14 +138,14 @@ class Autoencoder:
                 loss.backward()
                 optimizer.step()
 
-            # Test on the whole dataset at this epoch
+            # Test on the test dataset at this epoch
             self.encoder.eval()
             self.decoder.eval()
             with torch.no_grad():
-                x_rom = self.encoder(x)
+                x_rom = self.encoder(x_test)
                 x_full_pred = self.decoder(x_rom)
                 loss = criterion(x_full_pred, x_test)
-                print("Epoch {}: Loss = {}".format(epoch, loss))
+                print("Held out test dataset - Epoch {}: Loss = {}".format(epoch, loss))
             self.encoder.train()
             self.decoder.train()
 
