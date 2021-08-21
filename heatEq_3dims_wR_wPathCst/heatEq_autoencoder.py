@@ -169,7 +169,7 @@ class Autoencoder:
     def decode(self, x_rom_nparr):
         # Expected shape of x_rom_nparr is (x_rom_dim, )
         # Reshape to match decoder dimensions
-        x_rom_nparr = x_rom_nparr.reshape(1, 5)
+        x_rom_nparr = x_rom_nparr.reshape(1, 3)
         self.decoder.eval()
         with torch.no_grad():
             x_decoded = self.decoder(x_rom_nparr)
