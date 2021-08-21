@@ -23,9 +23,9 @@ from scipy import optimize
 class Encoder(nn.Module):
     def __init__(self, x_dim, x_rom_dim):
         super(Encoder, self).__init__()
-        h1_nodes = min(x_rom_dim, (x_dim + x_rom_dim) // 2)
-        h2_nodes = min(x_rom_dim, (x_dim + x_rom_dim) // 2)
-        h3_nodes = min(x_rom_dim, (x_dim + x_rom_dim) // 4)
+        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
+        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
+        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)
 
         self.input = nn.Linear(x_dim, h1_nodes)
         self.h1 = nn.Linear(h1_nodes, h2_nodes)
@@ -54,9 +54,9 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, x_dim, x_rom_dim):
         super(Decoder, self).__init__()
-        h1_nodes = min(x_rom_dim, (x_dim + x_rom_dim) // 4)
-        h2_nodes = min(x_rom_dim, (x_dim + x_rom_dim) // 2)
-        h3_nodes = min(x_rom_dim, (x_dim + x_rom_dim) // 2)
+        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)
+        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
+        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)
 
         self.input = nn.Linear(x_rom_dim, h1_nodes)
         self.h1 = nn.Linear(h1_nodes, h2_nodes)
