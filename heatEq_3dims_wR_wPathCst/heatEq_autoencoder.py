@@ -119,16 +119,16 @@ class Autoencoder:
         self.encoder.train()
         self.decoder.train()
 
-        mb_loader = torch.utils.data.DataLoader(x, batch_size=200, shuffle=True)
+        mb_loader = torch.utils.data.DataLoader(x, batch_size=100, shuffle=True)
 
         param_wrapper = nn.ParameterList()
         param_wrapper.extend(self.encoder.parameters())
         param_wrapper.extend(self.decoder.parameters())
 
-        optimizer = optim.SGD(param_wrapper, lr=0.05)
+        optimizer = optim.SGD(param_wrapper, lr=0.01)
         criterion = nn.MSELoss()
 
-        for epoch in range(1000):
+        for epoch in range(2000):
             for x_mb in mb_loader:
                 optimizer.zero_grad()
                 x_rom_mb = self.encoder(x_mb)
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     data = pd.read_csv("data/autoencoder_training_data.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
     autoencoder.fit(data)
-    with open("heatEq_autoencoder_3dim.pickle", "wb") as model:
+    with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
         pickle.dump(autoencoder, model)
 
 
