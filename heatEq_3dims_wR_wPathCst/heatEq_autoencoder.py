@@ -113,8 +113,9 @@ class Autoencoder:
         x_tensor = torch.tensor(x)
         return x_tensor
 
-    def fit(self, dataframe):
+    def fit(self, dataframe, test_dataframe):
         x = self.process_and_normalize_data(dataframe)
+        x_test = self.transform_data_without_fit(test_dataframe)
 
         self.encoder.train()
         self.decoder.train()
@@ -143,7 +144,7 @@ class Autoencoder:
             with torch.no_grad():
                 x_rom = self.encoder(x)
                 x_full_pred = self.decoder(x_rom)
-                loss = criterion(x_full_pred, x)
+                loss = criterion(x_full_pred, x_test)
                 print("Epoch {}: Loss = {}".format(epoch, loss))
             self.encoder.train()
             self.decoder.train()
@@ -204,7 +205,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     u1_score = dataframe_score["u1"].to_numpy().flatten()
 
     # We need to split x_rom and u to into a list of 240 trajectories for sindy
-    num_trajectories = 180
+    num_trajectories = 1680
     u0_list_fit = np.split(u0_fit, num_trajectories)
     u1_list_fit = np.split(u1_fit, num_trajectories)
     u_list_fit = []
@@ -212,7 +213,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
         u_list_fit.append(np.hstack((u0_fit.reshape(-1, 1), u1_fit.reshape(-1, 1))))
     x_rom_list_fit = np.split(x_rom_fit, num_trajectories, axis=0)
 
-    num_trajectories = 60
+    num_trajectories = 240
     u0_list_score = np.split(u0_score, num_trajectories)
     u1_list_score = np.split(u1_score, num_trajectories)
     u_list_score = []
@@ -226,14 +227,17 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=True, degree=2)
+    fourier_library = pysindy.FourierLibrary(n_frequencies=1)
+    identity_library = pysindy.IdentityLibrary()
+    combined_library = poly_library + fourier_library + identity_library
 
     # Smooth our possibly noisy data (as it is generated with random spiky controls) (doesn't work)
     smoothed_fd = pysindy.SmoothedFiniteDifference()
 
     # Tell Sindy that the data is recorded at 0.1s intervals
     # sindy_model = pysindy.SINDy(t_default=0.1)
-    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library)
+    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=combined_library)
     # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
 
     # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
@@ -267,8 +271,9 @@ def discover_objectives(ae_model):
 
 if __name__ == "__main__":
     data = pd.read_csv("data/autoencoder_training_data.csv")
+    test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
-    autoencoder.fit(data)
+    autoencoder.fit(data, test_data)
     with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
         pickle.dump(autoencoder, model)
 
@@ -287,9 +292,9 @@ if __name__ == "__main__":
     #   -38.80465    -4.298748   65.039635 -147.96707   -52.63922
 
 
-    # data_fit = pd.read_csv("heatEq_180_trajectories_df_sindy_fit.csv")
-    # data_score = pd.read_csv("heatEq_60_trajectories_df_sindy_score.csv")
-    # autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
+    # data_fit = pd.read_csv("data/autoencoder_training_data.csv")
+    # data_score = pd.read_csv("heatEq_240_trajectories_df.csv")
+    # autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000_loss0.00283.pickle")
     # sindy(autoencoder, data_fit, data_score)
 
     # Discover setpoint for x_rom

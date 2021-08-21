@@ -749,10 +749,13 @@ def generate_trajectories(save_csv=False):
 
         print("Samples: ", num_samples)
 
+    # if save_csv:
+    #     simple_60_trajectories_df.to_csv("heatEq_240_trajectories_df.csv")
+    #     obey_path_df.to_csv("heatEq_obey_path_df.csv")
+    #     violate_path_df.to_csv("heatEq_violate_path_df.csv")
+
     if save_csv:
-        simple_60_trajectories_df.to_csv("heatEq_240_trajectories_df.csv")
-        obey_path_df.to_csv("heatEq_obey_path_df.csv")
-        violate_path_df.to_csv("heatEq_violate_path_df.csv")
+        simple_60_trajectories_df.to_csv("validation_dataset_3dim_wR_wPathCst.csv")
 
 
 def load_pickle(filename):
@@ -845,7 +848,7 @@ def replay(trajectory_df_filename, buffer_capacity=360):
 
 
 if __name__ == "__main__":
-    # generate_trajectories(save_csv=True)
+    generate_trajectories(save_csv=True)
 
     # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
@@ -862,7 +865,7 @@ if __name__ == "__main__":
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
-    heatEq_system = HeatEqSimulator()
-    heatEq_system.mpc_control()
-    main_res, _ = heatEq_system.parse_mpc_results()
-    heatEq_system.plot(main_res)
+    # heatEq_system = HeatEqSimulator()
+    # heatEq_system.mpc_control()
+    # main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system.plot(main_res)
