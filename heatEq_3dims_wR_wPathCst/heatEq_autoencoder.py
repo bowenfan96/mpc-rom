@@ -1,3 +1,4 @@
+import sklearn.metrics
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -145,7 +146,8 @@ class Autoencoder:
                 x_rom = self.encoder(x_test)
                 x_full_pred = self.decoder(x_rom)
                 loss = criterion(x_full_pred, x_test)
-                print("Held out test dataset - Epoch {}: Loss = {}".format(epoch, loss))
+                mae = metrics.mean_absolute_percentage_error(x_full_pred, x_test)
+                print("Held out test dataset - Epoch {}: MSE = {}, MAE = {}".format(epoch, loss, mae))
             self.encoder.train()
             self.decoder.train()
 
