@@ -274,8 +274,8 @@ if __name__ == "__main__":
     test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
     autoencoder.fit(data, test_data)
-    with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
-        pickle.dump(autoencoder, model)
+    # with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
+    #     pickle.dump(autoencoder, model)
 
 
     # Get x_rom initial values
