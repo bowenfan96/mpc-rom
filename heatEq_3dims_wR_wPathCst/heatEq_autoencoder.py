@@ -198,8 +198,8 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     x_rom_score = ae_model.encode(dataframe_score).to_numpy()
 
     # Try to scale x_rom to the same order to magnitude as u
-    x_rom_fit = x_rom_fit * 10
-    x_rom_score = x_rom_score * 10
+    x_rom_fit = x_rom_fit * 100
+    x_rom_score = x_rom_score * 100
 
     # Sindy needs to know the controller signals
     u0_fit = dataframe_fit["u0"].to_numpy().flatten()
@@ -231,7 +231,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
     poly_library = pysindy.PolynomialLibrary(include_interaction=True, degree=2)
-    fourier_library = pysindy.FourierLibrary(n_frequencies=1)
+    fourier_library = pysindy.FourierLibrary(n_frequencies=2)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
 
@@ -240,7 +240,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
 
     # Tell Sindy that the data is recorded at 0.1s intervals
     # sindy_model = pysindy.SINDy(t_default=0.1)
-    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=combined_library)
+    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library)
     # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
 
     # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
@@ -273,12 +273,12 @@ def discover_objectives(ae_model):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("data/autoencoder_training_data.csv")
-    test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
-    autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
-    autoencoder.fit(data, test_data)
-    with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
-        pickle.dump(autoencoder, model)
+    # data = pd.read_csv("data/autoencoder_training_data.csv")
+    # test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
+    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
+    # autoencoder.fit(data, test_data)
+    # with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
+    #     pickle.dump(autoencoder, model)
 
 
     # Get x_rom initial values
@@ -295,10 +295,10 @@ if __name__ == "__main__":
     #   -38.80465    -4.298748   65.039635 -147.96707   -52.63922
 
 
-    # data_fit = pd.read_csv("data/autoencoder_training_data.csv")
-    # data_score = pd.read_csv("heatEq_240_trajectories_df.csv")
-    # autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000_loss0.00283.pickle")
-    # sindy(autoencoder, data_fit, data_score)
+    data_fit = pd.read_csv("data/autoencoder_training_data.csv")
+    data_score = pd.read_csv("heatEq_240_trajectories_df.csv")
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000_loss0.00283.pickle")
+    sindy(autoencoder, data_fit, data_score)
 
     # Discover setpoint for x_rom
     # autoencoder = load_pickle("heatEq_autoencoder_5dim.pickle")
