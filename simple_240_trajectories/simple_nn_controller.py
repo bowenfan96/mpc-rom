@@ -107,7 +107,7 @@ class SimpleNNController:
         ctg_criterion = nn.MSELoss()
         cst_criterion = nn.MSELoss()
 
-        for epoch in range(400):
+        for epoch in range(500):
             for x_mb, u_mb, ctg_mb, cst_mb in mb_loader:
                 ctg_optimizer.zero_grad()
                 cst_optimizer.zero_grad()
