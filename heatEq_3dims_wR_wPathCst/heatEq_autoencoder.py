@@ -395,14 +395,18 @@ def run_svm():
     # The equation of the separating plane is given by all x so that np.dot(svc.coef_[0], x) + b = 0.
     # Solve for w3 (z)
     z = lambda x, y: (-clf.intercept_[0] - clf.coef_[0][0] * x - clf.coef_[0][1] * y) / clf.coef_[0][2]
-    tmp = np.linspace(-2, 2, 30)
+    tmp = np.linspace(-1.5, 2.5, 40)
     x, y = np.meshgrid(tmp, tmp)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot3D(X[Y == 0, 0], X[Y == 0, 1], X[Y == 0, 2], 'ob')
     ax.plot3D(X[Y == 1, 0], X[Y == 1, 1], X[Y == 1, 2], 'sr')
-    ax.plot_surface(x, y, z(x, y))
-    ax.view_init(30, 60)
+    ax.plot_surface(x, y, z(x, y), alpha=0.2)
+    ax.set_xlim3d(-1, 2)
+    ax.set_ylim3d(-1, 2)
+    ax.set_zlim3d(-1, 2)
+    ax.view_init(0, -60)
+    plt.ion()
     plt.show()
     plt.savefig("svm_decision_boundary.svg", format="svg")
 
