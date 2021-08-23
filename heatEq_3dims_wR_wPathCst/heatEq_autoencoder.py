@@ -386,15 +386,16 @@ def generate_data_for_svm():
 def run_svm():
     training_df = pd.read_csv("svm_training_data.csv")
     x_y = training_df.to_numpy()
-    X = x_y[:, 0:3]
+    X = x_y[:, 1:4]
+    print(X)
     Y = x_y[:, -1]
-
+    print(Y)
     model = svm.SVC(kernel='linear', verbose=1)
     clf = model.fit(X, Y)
     # The equation of the separating plane is given by all x so that np.dot(svc.coef_[0], x) + b = 0.
     # Solve for w3 (z)
     z = lambda x, y: (-clf.intercept_[0] - clf.coef_[0][0] * x - clf.coef_[0][1] * y) / clf.coef_[0][2]
-    tmp = np.linspace(-5, 5, 30)
+    tmp = np.linspace(-2, 2, 30)
     x, y = np.meshgrid(tmp, tmp)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -403,6 +404,7 @@ def run_svm():
     ax.plot_surface(x, y, z(x, y))
     ax.view_init(30, 60)
     plt.show()
+    plt.savefig("svm_decision_boundary.svg", format="svg")
 
 
 
