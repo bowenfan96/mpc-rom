@@ -104,4 +104,8 @@
 
 
 for i in range(20):
-    print("self.model.x{}[time+1].fix(x[{}][time+1])".format(i, i))
+    # print("self.model.x{}[time+1].fix(x[{}][time+1])".format(i, i))
+    print("self.model.x{}[t].fix(x[{}][time+1])".format(i, i))
+
+# for i in range(20):
+#     print("self.model.x{}[time].fix(value(self.mismatched_plant.model.x{}[time]))".format(i, i))
