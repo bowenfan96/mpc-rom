@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchinfo import summary
 import pickle
@@ -18,6 +19,8 @@ from deeptime.sindy import STLSQ
 from deeptime.sindy import SINDy
 
 from scipy import optimize
+
+from sklearn import svm
 
 
 class Encoder(nn.Module):
@@ -315,7 +318,104 @@ def discover_objectives(ae_model):
     return x_rom_setpoints
 
 
+def generate_data_for_svm():
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+
+    num_samples = 3000
+
+    # Rough calculation: 263 to 313 = 50, 263 to 343 = 80, 80*20 = 1600
+    # Generate PASS data: x5 is less than 313
+    pass_states = []
+    for i in range(num_samples):
+        # x0 to x19 can be anything in the range of 263 to 343 (from initial-10 to setpoint+10)
+        x0_x4 = np.random.randint(low=263, high=343, size=(5, ))
+        # x5 must be less than 313
+        x5 = np.random.randint(low=263, high=313)
+        x6_x19 = np.random.randint(low=263, high=343, size=(14,))
+        # Get one pass state, append to list of passed state - label is 1
+        state = np.hstack((x0_x4, x5, x6_x19)).flatten()
+        pass_states.append(state)
+
+    # Convert the passed states in the full state space to the reduced space
+    pass_states = np.array(pass_states)
+    df_cols = []
+    for i in range(20):
+        df_cols.append("x{}".format(i))
+    pass_states_df = pd.DataFrame(pass_states, columns=df_cols)
+    print(pass_states_df)
+
+    rom_pass_states = autoencoder.encode(pass_states_df)
+
+    # Create a vector of ones to label the pass state
+    ones_vector = np.ones(shape=num_samples, dtype=int)
+    ones_vector_df = pd.DataFrame(ones_vector, columns=["pass"])
+    # hstack pass dataframe with label
+    pass_df = pd.concat([rom_pass_states, ones_vector_df], axis=1)
+
+    # Generate FAIL data: x5 is more than 313
+    fail_states = []
+    for i in range(num_samples):
+        # x0 to x19 can be anything in the range of 263 to 343 (from initial-10 to setpoint+10)
+        x0_x4 = np.random.randint(low=263, high=343, size=(5, ))
+        # x5 fails if its more than 313
+        x5 = np.random.randint(low=314, high=333)
+        x6_x19 = np.random.randint(low=263, high=343, size=(14,))
+        # Get one fail state, append to list of failed states - label is 0
+        state = np.hstack((x0_x4, x5, x6_x19)).flatten()
+        fail_states.append(state)
+
+    # Convert the failed states in the full state space to the reduced space
+    fail_states = np.array(fail_states)
+    #
+    fail_states_df = pd.DataFrame(fail_states, columns=df_cols)
+    print(fail_states_df)
+
+    rom_fail_states = autoencoder.encode(fail_states_df)
+
+    # Create a vector of zeros to label the fail state
+    zeros_vector = np.zeros(shape=num_samples, dtype=int)
+    zeros_vector_df = pd.DataFrame(zeros_vector, columns=["pass"])
+    # hstack pass dataframe with label
+    fail_df = pd.concat([rom_fail_states, zeros_vector_df], axis=1)
+
+    # vstack the SVM training data and save to csv
+    svm_training_data = pd.concat([pass_df, fail_df], axis=0)
+    svm_training_data.to_csv("svm_training_data.csv")
+
+
+def run_svm():
+    training_df = pd.read_csv("svm_training_data.csv")
+    x_y = training_df.to_numpy()
+    X = x_y[:, 0:3]
+    Y = x_y[:, -1]
+
+    model = svm.SVC(kernel='linear', verbose=1)
+    clf = model.fit(X, Y)
+    # The equation of the separating plane is given by all x so that np.dot(svc.coef_[0], x) + b = 0.
+    # Solve for w3 (z)
+    z = lambda x, y: (-clf.intercept_[0] - clf.coef_[0][0] * x - clf.coef_[0][1] * y) / clf.coef_[0][2]
+    tmp = np.linspace(-5, 5, 30)
+    x, y = np.meshgrid(tmp, tmp)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot3D(X[Y == 0, 0], X[Y == 0, 1], X[Y == 0, 2], 'ob')
+    ax.plot3D(X[Y == 1, 0], X[Y == 1, 1], X[Y == 1, 2], 'sr')
+    ax.plot_surface(x, y, z(x, y))
+    ax.view_init(30, 60)
+    plt.show()
+
+
+
+
 if __name__ == "__main__":
+    # generate_data_for_svm()
+    run_svm()
+
+
+
+
+
+
     # data = pd.read_csv("data/autoencoder_training_data.csv")
     # test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
     # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
@@ -335,9 +435,9 @@ if __name__ == "__main__":
 # return m.x2_dot[_t] = -0.615 1 + 0.955* self.model.x0[_t] + 0.906* self.model.x1[_t] + 2.317* self.model.x2[_t] + -4.927* self.model.u0[_t] + 1.063* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 0.264* self.model.x2[_t]**2 + 1.581* self.model.u0[_t]**2 + 0.677 *self.model.u1[_t]**2
 # 0.2593598175662833
 
-    data_score = pd.read_csv("heatEq_240_trajectories_df.csv")
-    data_fit = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
-    sindy(autoencoder, data_fit, data_score)
+    # data_score = pd.read_csv("heatEq_240_trajectories_df.csv")
+    # data_fit = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
+    # autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+    # sindy(autoencoder, data_fit, data_score)
 
 
