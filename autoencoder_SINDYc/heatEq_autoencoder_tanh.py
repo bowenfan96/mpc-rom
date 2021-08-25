@@ -76,9 +76,9 @@ class Decoder(nn.Module):
         nn.init.kaiming_uniform_(self.h3.weight)
 
     def forward(self, x_rom_in):
-        xe1 = F.elu(self.input(x_rom_in))
-        xe2 = F.elu(self.h1(xe1))
-        xe3 = F.elu(self.h2(xe2))
+        xe1 = F.tanh(self.input(x_rom_in))
+        xe2 = F.tanh(self.h1(xe1))
+        xe3 = F.tanh(self.h2(xe2))
         x_full_out = (self.h3(xe3))
 
         # xe1 = F.leaky_relu(self.input(x_rom_in))
@@ -344,135 +344,20 @@ def discover_objectives(ae_model):
     return x_rom_setpoints
 
 
-def generate_data_for_svm():
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
-
-    num_samples = 3000
-
-    # Rough calculation: 263 to 313 = 50, 263 to 343 = 80, 80*20 = 1600
-    # Generate PASS data: x5 is less than 313
-    pass_states = []
-    for i in range(num_samples):
-        # x0 to x19 can be anything in the range of 263 to 343 (from initial-10 to setpoint+10)
-        x0_x4 = np.random.randint(low=263, high=343, size=(5, ))
-        # x5 must be less than 313
-        x5 = np.random.randint(low=263, high=313)
-        x6_x19 = np.random.randint(low=263, high=343, size=(14,))
-        # Get one pass state, append to list of passed state - label is 1
-        state = np.hstack((x0_x4, x5, x6_x19)).flatten()
-        pass_states.append(state)
-
-    # Convert the passed states in the full state space to the reduced space
-    pass_states = np.array(pass_states)
-    df_cols = []
-    for i in range(20):
-        df_cols.append("x{}".format(i))
-    pass_states_df = pd.DataFrame(pass_states, columns=df_cols)
-    print(pass_states_df)
-
-    rom_pass_states = autoencoder.encode(pass_states_df)
-
-    # Create a vector of ones to label the pass state
-    ones_vector = np.ones(shape=num_samples, dtype=int)
-    ones_vector_df = pd.DataFrame(ones_vector, columns=["pass"])
-    # hstack pass dataframe with label
-    pass_df = pd.concat([rom_pass_states, ones_vector_df], axis=1)
-
-    # Generate FAIL data: x5 is more than 313
-    fail_states = []
-    for i in range(num_samples):
-        # x0 to x19 can be anything in the range of 263 to 343 (from initial-10 to setpoint+10)
-        x0_x4 = np.random.randint(low=263, high=343, size=(5, ))
-        # x5 fails if its more than 313
-        x5 = np.random.randint(low=314, high=333)
-        x6_x19 = np.random.randint(low=263, high=343, size=(14,))
-        # Get one fail state, append to list of failed states - label is 0
-        state = np.hstack((x0_x4, x5, x6_x19)).flatten()
-        fail_states.append(state)
-
-    # Convert the failed states in the full state space to the reduced space
-    fail_states = np.array(fail_states)
-    #
-    fail_states_df = pd.DataFrame(fail_states, columns=df_cols)
-    print(fail_states_df)
-
-    rom_fail_states = autoencoder.encode(fail_states_df)
-
-    # Create a vector of zeros to label the fail state
-    zeros_vector = np.zeros(shape=num_samples, dtype=int)
-    zeros_vector_df = pd.DataFrame(zeros_vector, columns=["pass"])
-    # hstack pass dataframe with label
-    fail_df = pd.concat([rom_fail_states, zeros_vector_df], axis=1)
-
-    # vstack the SVM training data and save to csv
-    svm_training_data = pd.concat([pass_df, fail_df], axis=0)
-    svm_training_data.to_csv("svm_training_data.csv")
-
-
-def run_svm():
-    training_df = pd.read_csv("../heatEq_3dims_wR_wPathCst/svm_training_data.csv")
-    x_y = training_df.to_numpy()
-    X = x_y[:, 1:4]
-    print(X)
-    Y = x_y[:, -1]
-    print(Y)
-    model = svm.SVC(kernel='linear', verbose=1)
-    clf = model.fit(X, Y)
-    # The equation of the separating plane is given by all x so that np.dot(svc.coef_[0], x) + b = 0.
-    # Solve for w3 (z)
-    z = lambda x, y: (-clf.intercept_[0] - clf.coef_[0][0] * x - clf.coef_[0][1] * y) / clf.coef_[0][2]
-    tmp = np.linspace(-1.5, 2.5, 40)
-    x, y = np.meshgrid(tmp, tmp)
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot3D(X[Y == 0, 0], X[Y == 0, 1], X[Y == 0, 2], 'ob')
-    ax.plot3D(X[Y == 1, 0], X[Y == 1, 1], X[Y == 1, 2], 'sr')
-    ax.plot_surface(x, y, z(x, y), alpha=0.2)
-    ax.set_xlim3d(-1, 2)
-    ax.set_ylim3d(-1, 2)
-    ax.set_zlim3d(-1, 2)
-    ax.view_init(0, -60)
-    plt.ion()
-    plt.show()
-    plt.savefig("svm_decision_boundary.svg", format="svg")
-
-
-
-
 if __name__ == "__main__":
-    # generate_data_for_svm()
-    # run_svm()
+    data = pd.read_csv("data/autoencoder_training_data.csv")
+    test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
+    autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
+    autoencoder.fit(data, test_data)
+    with open("heatEq_autoencoder_3dim_tanh.pickle", "wb") as model:
+        pickle.dump(autoencoder, model)
 
+    # data_score = pd.read_csv("../heatEq_3dims_wR_wPathCst/heatEq_240_trajectories_df.csv")
+    # data_fit = pd.read_csv("../heatEq_3dims_wR_wPathCst/validation_dataset_3dim_wR_wPathCst.csv")
+    # autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+    # sindy(autoencoder, data_fit, data_score)
 
-
-
-
-
-    # data = pd.read_csv("data/autoencoder_training_data.csv")
-    # test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
-    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
-    # autoencoder.fit(data, test_data)
-    # with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
-    #     pickle.dump(autoencoder, model)
-
-
-
-
-
-#x0' = 7.873 1 + -5.435 x0 + -7.725 x1 + -6.196 x2 + 2.014 u0 + 1.843 u1 + -0.161 x0^2 + 1.419 x1^2 + -1.618 x2^2 + -0.166 u0^2 + 0.513 u1^2
-# x1' = -10.699 1 + 10.793 x0 + 9.294 x1 + 6.198 x2 + 1.789 u0 + -3.086 u1 + -2.686 x0^2 + -0.930 x1^2 + 1.490 x2^2 + -0.999 u0^2 + -1.779 u1^2
-# x2' = -0.615 1 + 0.955 x0 + 0.906 x1 + 2.317 x2 + -4.927 u0 + 1.063 x0^2 + -0.930 x1^2 + 0.264 x2^2 + 1.581 u0^2 + 0.677 u1^2
-# return m.x0_dot[_t] = 7.873 1 + -5.435* self.model.x0[_t] + -7.725* self.model.x1[_t] + -6.196* self.model.x2[_t] + 2.014* self.model.u0[_t] + 1.843* self.model.u1[_t] + -0.161* self.model.x0[_t]**2 + 1.419* self.model.x1[_t]**2 + -1.618* self.model.x2[_t]**2 + -0.166* self.model.u0[_t]**2 + 0.513 *self.model.u1[_t]**2
-# return m.x1_dot[_t] = -10.699 1 + 10.793* self.model.x0[_t] + 9.294* self.model.x1[_t] + 6.198* self.model.x2[_t] + 1.789* self.model.u0[_t] + -3.086* self.model.u1[_t] + -2.686* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 1.490* self.model.x2[_t]**2 + -0.999* self.model.u0[_t]**2 + -1.779 *self.model.u1[_t]**2
-# return m.x2_dot[_t] = -0.615 1 + 0.955* self.model.x0[_t] + 0.906* self.model.x1[_t] + 2.317* self.model.x2[_t] + -4.927* self.model.u0[_t] + 1.063* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 0.264* self.model.x2[_t]**2 + 1.581* self.model.u0[_t]**2 + 0.677 *self.model.u1[_t]**2
-# 0.2593598175662833
-
-    data_score = pd.read_csv("../heatEq_3dims_wR_wPathCst/heatEq_240_trajectories_df.csv")
-    data_fit = pd.read_csv("../heatEq_3dims_wR_wPathCst/validation_dataset_3dim_wR_wPathCst.csv")
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
-    sindy(autoencoder, data_fit, data_score)
-
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
     input_weight = autoencoder.decoder.input.weight.detach().cpu().numpy().T
     input_bias = autoencoder.decoder.input.bias.detach().cpu().numpy().T
     h1_weight = autoencoder.decoder.h1.weight.detach().cpu().numpy().T
@@ -482,46 +367,46 @@ if __name__ == "__main__":
     h3_weight = autoencoder.decoder.h3.weight.detach().cpu().numpy().T
     h3_bias = autoencoder.decoder.h3.bias.detach().cpu().numpy().T
 
-    # np.save("autoencoder_weights_biases/input_weight", input_weight)
-    # np.save("autoencoder_weights_biases/input_bias", input_bias)
-    # np.save("autoencoder_weights_biases/h1_weight", h1_weight)
-    # np.save("autoencoder_weights_biases/h1_bias", h1_bias)
-    # np.save("autoencoder_weights_biases/h2_weight", h2_weight)
-    # np.save("autoencoder_weights_biases/h2_bias", h2_bias)
-    # np.save("autoencoder_weights_biases/h3_weight", h3_weight)
-    # np.save("autoencoder_weights_biases/h3_bias", h3_bias)
+    np.save("autoencoder_weights_biases_tanh/input_weight", input_weight)
+    np.save("autoencoder_weights_biases_tanh/input_bias", input_bias)
+    np.save("autoencoder_weights_biases_tanh/h1_weight", h1_weight)
+    np.save("autoencoder_weights_biases_tanh/h1_bias", h1_bias)
+    np.save("autoencoder_weights_biases_tanh/h2_weight", h2_weight)
+    np.save("autoencoder_weights_biases_tanh/h2_bias", h2_bias)
+    np.save("autoencoder_weights_biases_tanh/h3_weight", h3_weight)
+    np.save("autoencoder_weights_biases_tanh/h3_bias", h3_bias)
 
-    W = [input_weight, h1_weight, h2_weight, h3_weight]
-    B = [input_bias, h1_bias, h2_bias, h3_bias]
-
-    for i in range(4):
-        print(W[i].shape)
-        print(B[i].shape)
-
-    elu = lambda Z: np.where(Z>0, Z, np.exp(Z)-1)
-
-    y_pred = np.array([0.632633, -0.405015,  0.087859]).reshape(1, 3)
-    for i in range(4):
-        print(i)
-        if i == 3:
-            y_pred = y_pred @ W[i] + B[i]
-        else:
-            y_pred = elu(y_pred @ W[i] + B[i])
-
-    print(y_pred)
-    y_pred = np.array(y_pred).flatten().reshape(1, 20)
-
-    print("Custom output")
-    print(autoencoder.scaler_x.inverse_transform(y_pred))
-
-    print("Autoencoder output")
-    print(autoencoder.decode(np.array([0.632633, -0.405015,  0.087859])))
-
-    x_init = np.full(shape=(1, 20), fill_value=273)
-    df_cols = []
-    for i in range(20):
-        df_cols.append("x{}".format(i))
-    df = pd.DataFrame(x_init, columns=df_cols)
-    x_rom = autoencoder.encode(df)
-    print(x_rom)
-
+    # W = [input_weight, h1_weight, h2_weight, h3_weight]
+    # B = [input_bias, h1_bias, h2_bias, h3_bias]
+    #
+    # for i in range(4):
+    #     print(W[i].shape)
+    #     print(B[i].shape)
+    #
+    # elu = lambda Z: np.where(Z>0, Z, np.exp(Z)-1)
+    #
+    # y_pred = np.array([0.632633, -0.405015,  0.087859]).reshape(1, 3)
+    # for i in range(4):
+    #     print(i)
+    #     if i == 3:
+    #         y_pred = y_pred @ W[i] + B[i]
+    #     else:
+    #         y_pred = elu(y_pred @ W[i] + B[i])
+    #
+    # print(y_pred)
+    # y_pred = np.array(y_pred).flatten().reshape(1, 20)
+    #
+    # print("Custom output")
+    # print(autoencoder.scaler_x.inverse_transform(y_pred))
+    #
+    # print("Autoencoder output")
+    # print(autoencoder.decode(np.array([0.632633, -0.405015,  0.087859])))
+    #
+    # x_init = np.full(shape=(1, 20), fill_value=273)
+    # df_cols = []
+    # for i in range(20):
+    #     df_cols.append("x{}".format(i))
+    # df = pd.DataFrame(x_init, columns=df_cols)
+    # x_rom = autoencoder.encode(df)
+    # print(x_rom)
+    #
