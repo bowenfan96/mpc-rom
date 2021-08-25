@@ -9,7 +9,7 @@ from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
 
-from heatEq_nn_controller import *
+from heatEq_autoencoder import *
 
 results_folder = "heatEq_replay_results/vertex05-moreExpl/"
 
@@ -42,13 +42,13 @@ class HeatEqSimulator:
 
         # Set up all the finite elements
 
-        self.model.x0 = Var(self.model.time)
+        self.model.x0 = Var(self.model.time, initialize=x_init[0])
         self.model.x0_dot = DerivativeVar(self.model.x0, wrt=self.model.time)
         self.model.x0[0].fix(x_init[0])
-        self.model.x1 = Var(self.model.time)
+        self.model.x1 = Var(self.model.time, initialize=x_init[1])
         self.model.x1_dot = DerivativeVar(self.model.x1, wrt=self.model.time)
         self.model.x1[0].fix(x_init[1])
-        self.model.x2 = Var(self.model.time)
+        self.model.x2 = Var(self.model.time, initialize=x_init[2])
         self.model.x2_dot = DerivativeVar(self.model.x2, wrt=self.model.time)
         self.model.x2[0].fix(x_init[2])
 
@@ -106,10 +106,35 @@ class HeatEqSimulator:
             return m.L[m.time.last()] - m.L[0]
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
+        self.autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+
+        # self.model.max_x5 = Param()
+
         # # Constraint for the element at the 1/3 position: temperature must not exceed 313 K (10 K above setpoint)
-        # def _constraint_x5(m, _t):
-        #     return m.x5[_t] <= 313
-        # self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
+        def _constraint_x5(m, _t):
+            print("Hi I'm called")
+            print(m, _t)
+
+            x = np.array([m.x0[_t], m.x1[_t], m.x2[_t]])
+            W = np.array([1, 2, 3]).T
+
+            y = x @ W
+
+            print(y)
+
+            return y <= 10
+
+            # return m.x0[_t] <= 313
+
+            # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))))
+            # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))) <= 313)
+            return self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t])
+            # if self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t]) <= 1000:
+            #     return Constraint.Feasible
+            # else:
+            #     return Constraint.Infeasible
+
+        self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form
@@ -120,6 +145,8 @@ class HeatEqSimulator:
         # Make controls piecewise linear
         discretizer.reduce_collocation_points(self.model, var=self.model.u0, ncp=1, contset=self.model.time)
         discretizer.reduce_collocation_points(self.model, var=self.model.u1, ncp=1, contset=self.model.time)
+
+        print("Done init")
 
         return
 
