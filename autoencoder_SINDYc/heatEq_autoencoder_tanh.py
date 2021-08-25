@@ -346,7 +346,7 @@ def discover_objectives(ae_model):
 
 if __name__ == "__main__":
     data = pd.read_csv("data/autoencoder_training_data.csv")
-    test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
+    test_data = pd.read_csv("data/validation_dataset_3dim_wR_wPathCst.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
     autoencoder.fit(data, test_data)
     with open("heatEq_autoencoder_3dim_tanh.pickle", "wb") as model:
