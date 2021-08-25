@@ -410,7 +410,7 @@ def generate_data_for_svm():
 
 
 def run_svm():
-    training_df = pd.read_csv("svm_training_data.csv")
+    training_df = pd.read_csv("../heatEq_3dims_wR_wPathCst/svm_training_data.csv")
     x_y = training_df.to_numpy()
     X = x_y[:, 1:4]
     print(X)
@@ -467,8 +467,8 @@ if __name__ == "__main__":
 # return m.x2_dot[_t] = -0.615 1 + 0.955* self.model.x0[_t] + 0.906* self.model.x1[_t] + 2.317* self.model.x2[_t] + -4.927* self.model.u0[_t] + 1.063* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 0.264* self.model.x2[_t]**2 + 1.581* self.model.u0[_t]**2 + 0.677 *self.model.u1[_t]**2
 # 0.2593598175662833
 
-    data_score = pd.read_csv("heatEq_240_trajectories_df.csv")
-    data_fit = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
+    data_score = pd.read_csv("../heatEq_3dims_wR_wPathCst/heatEq_240_trajectories_df.csv")
+    data_fit = pd.read_csv("../heatEq_3dims_wR_wPathCst/validation_dataset_3dim_wR_wPathCst.csv")
     autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
     sindy(autoencoder, data_fit, data_score)
 

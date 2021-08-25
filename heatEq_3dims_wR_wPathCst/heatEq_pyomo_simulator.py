@@ -281,6 +281,8 @@ class HeatEqSimulator:
         mpc_solver = SolverFactory("ipopt", tee=True)
         # mpc_solver.options['max_iter'] = 10000
         mpc_results = mpc_solver.solve(self.model)
+        self.model.display()
+        print(mpc_results)
 
         return mpc_results
 
@@ -848,7 +850,7 @@ def replay(trajectory_df_filename, buffer_capacity=360):
 
 
 if __name__ == "__main__":
-    generate_trajectories(save_csv=True)
+    # generate_trajectories(save_csv=True)
 
     # main_simple_sys = HeatEqSimulator()
     # main_nn_model = load_pickle("simple_nn_controller.pickle")
@@ -865,7 +867,8 @@ if __name__ == "__main__":
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
-    # heatEq_system = HeatEqSimulator()
-    # heatEq_system.mpc_control()
+    heatEq_system = HeatEqSimulator()
+    heatEq_system.mpc_control()
+    heatEq_system.model.display()
     # main_res, _ = heatEq_system.parse_mpc_results()
     # heatEq_system.plot(main_res)
