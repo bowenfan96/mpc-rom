@@ -76,9 +76,9 @@ class Decoder(nn.Module):
         nn.init.kaiming_uniform_(self.h3.weight)
 
     def forward(self, x_rom_in):
-        xe1 = F.tanh(self.input(x_rom_in))
-        xe2 = F.tanh(self.h1(xe1))
-        xe3 = F.tanh(self.h2(xe2))
+        xe1 = torch.tanh(self.input(x_rom_in))
+        xe2 = torch.tanh(self.h1(xe1))
+        xe3 = torch.tanh(self.h2(xe2))
         x_full_out = (self.h3(xe3))
 
         # xe1 = F.leaky_relu(self.input(x_rom_in))
