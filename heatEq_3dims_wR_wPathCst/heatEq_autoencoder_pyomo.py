@@ -1,6 +1,7 @@
 import csv
 import datetime
 import pickle
+import time
 
 import numpy as np
 import pandas as pd
@@ -29,18 +30,8 @@ class HeatEqSimulator:
         self.model.time = ContinuousSet(bounds=(0, duration))
 
         # Initial state: the rod is 273 Kelvins throughout (all x_full = 273)
-        # Initial values for x_rom:
-        #      x0_rom    x1_rom    x2_rom    x3_rom    x4_rom
-        #   -0.203286 -0.271189  0.407007 -0.666588 -0.234218
-        x_init = [0.2628937,  0.6858409,  0.44120657]
-
-        # NOTE: Pyomo can simulate via scipy/casadi only if:
-        # 1. model.u is indexed only by time, so Bu using matrix multiplication is not possible
-        # 2. model contains if statements, so the ode cannot have conditions
-        # After trying many things, this (silly) method seems to be the only way
-        # if we want pyomo to simulate with random controls
-
-        # Set up all the finite elements
+        # Initial values for x_rom - SCALED FOR SINDY
+        x_init = [0.2628937, 0.6858409, 0.44120657]
 
         self.model.x0 = Var(self.model.time, initialize=x_init[0])
         self.model.x0_dot = DerivativeVar(self.model.x0, wrt=self.model.time)
@@ -107,32 +98,57 @@ class HeatEqSimulator:
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
         self.autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+        w1 = np.load("autoencoder_weights_biases/input_weight.npy")
+        w2 = np.load("autoencoder_weights_biases/h1_weight.npy")
+        w3 = np.load("autoencoder_weights_biases/h2_weight.npy")
+        w4 = np.load("autoencoder_weights_biases/h3_weight.npy")
 
-        # self.model.max_x5 = Param()
+        b1 = np.load("autoencoder_weights_biases/input_bias.npy")
+        b2 = np.load("autoencoder_weights_biases/h1_bias.npy")
+        b3 = np.load("autoencoder_weights_biases/h2_bias.npy")
+        b4 = np.load("autoencoder_weights_biases/h3_bias.npy")
+
+        W = [w1, w2, w3, w4]
+        B = [b1, b2, b3, b4]
+        elu = lambda Z: np.where(Z > 0, Z, np.exp(Z) - 1)
 
         # # Constraint for the element at the 1/3 position: temperature must not exceed 313 K (10 K above setpoint)
         def _constraint_x5(m, _t):
-            print("Hi I'm called")
-            print(m, _t)
+            # sindy scaler_x.inverse_transform
 
-            x = np.array([m.x0[_t], m.x1[_t], m.x2[_t]])
-            W = np.array([1, 2, 3]).T
+            # Array of pyomo model variables
+            x_hat = np.array([m.x0[_t], m.x1[_t], m.x2[_t]]).reshape(1, 3)
 
-            y = x @ W
+            x_hat = x_hat @ W[0] + B[0]
+            for row in range(x_hat.shape[0]):
+                for col in range(x_hat.shape[1]):
+                    x_hat[row, col] = tanh(x_hat[row, col])
 
-            print(y)
+            x_hat = x_hat @ W[1] + B[1]
+            for row in range(x_hat.shape[0]):
+                for col in range(x_hat.shape[1]):
+                    x_hat[row, col] = tanh(x_hat[row, col])
 
-            return y <= 10
+            x_hat = x_hat @ W[2] + B[2]
+            for row in range(x_hat.shape[0]):
+                for col in range(x_hat.shape[1]):
+                    x_hat[row, col] = tanh(x_hat[row, col])
+
+            x_hat = x_hat @ W[3] + B[3]
+
+            # print(value(x_hat))
+            # x_hat = pyomo.core.tanh(x_hat)
+
+            x_hat = np.array(x_hat).flatten().reshape(1, 20)
+            # x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
+            x_hat = x_hat.flatten()
+            return x_hat[5] <= 313
 
             # return m.x0[_t] <= 313
-
             # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))))
             # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))) <= 313)
-            return self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t])
-            # if self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t]) <= 1000:
-            #     return Constraint.Feasible
-            # else:
-            #     return Constraint.Infeasible
+            # return self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t])
+
 
         self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
