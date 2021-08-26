@@ -185,70 +185,80 @@ class HeatEqSimulator:
         controller_weight = 1 - setpoint_weight
 
         # Lagrangian cost
+        # def _Lagrangian(m, _t):
+        #     # Array of pyomo model variables
+        #     x_hat = np.array([m.x0[_t], m.x1[_t], m.x2[_t]]).reshape(1, 3)
+        #
+        #     # print(x_hat)
+        #
+        #     def _sindy_inverse_transform(x, idx):
+        #         x = (x - 1) * (self.sindy_dataMax[idx] - self.sindy_dataMin[idx]) + self.sindy_dataMin[idx]
+        #         return x
+        #     for idx in range(x_hat.shape[0]):
+        #         # x_hat[idx] = _sindy_inverse_transform(x_hat[idx], idx)
+        #         x_hat[idx] = (x_hat[idx] - 1) * (self.sindy_dataMax[idx] - self.sindy_dataMin[idx]) + self.sindy_dataMin[idx]
+        #
+        #     # print(x_hat)
+        #
+        #     # Forward pass
+        #     x_hat = x_hat @ W[0] + B[0]
+        #     for row in range(x_hat.shape[0]):
+        #         for col in range(x_hat.shape[1]):
+        #             x_hat[row, col] = tanh(x_hat[row, col])
+        #
+        #     x_hat = x_hat @ W[1] + B[1]
+        #     for row in range(x_hat.shape[0]):
+        #         for col in range(x_hat.shape[1]):
+        #             x_hat[row, col] = tanh(x_hat[row, col])
+        #
+        #     x_hat = x_hat @ W[2] + B[2]
+        #     for row in range(x_hat.shape[0]):
+        #         for col in range(x_hat.shape[1]):
+        #             x_hat[row, col] = tanh(x_hat[row, col])
+        #
+        #     x_hat = x_hat @ W[3] + B[3]
+        #
+        #     # print(x_hat)
+        #
+        #     x_hat = np.array(x_hat).flatten()
+        #
+        #     def _ae_inverse_transform(x, idx):
+        #         x = (x - 1) * (self.ae_dataMax[idx] - self.ae_dataMin[idx]) + self.ae_dataMin[idx]
+        #         return x
+        #     for idx in range(x_hat.shape[0]):
+        #         x_hat[idx] = (x_hat[idx] - 1) * (self.ae_dataMax[idx] - self.ae_dataMin[idx]) + self.ae_dataMin[idx]
+        #         # x_hat[idx] = _ae_inverse_transform(x_hat[idx], idx)
+        #
+        #     # x_hat = self.sindy.x_rom_scaler.inverse_transform(x_hat)
+        #     # x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
+        #     x_hat = x_hat.flatten()
+        #
+        #     x5 = x_hat[5]
+        #
+        #     # print(x5)
+        #
+        #     x13 = x_hat[13]
+        #
+        #     # print(x13)
+        #
+        #     # Scale u0 and u1 into Sindy space for cost
+        #     u0_273 = self.sindy.u0_scaler.transform(np.array(273).reshape(-1, 1)).flatten()
+        #     u1_273 = self.sindy.u1_scaler.transform(np.array(273).reshape(-1, 1)).flatten()
+        #
+        #     return m.L_dot[_t] == setpoint_weight * ((x5 - 303) ** 2 + (x13 - 333) ** 2) \
+        #            + controller_weight * ((m.u0[_t] - u0_273[0]) ** 2 + (m.u1[_t] - u1_273[0]) ** 2)
+
+        # self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
+
+        # Lagrangian cost
         def _Lagrangian(m, _t):
-            # Array of pyomo model variables
-            x_hat = np.array([m.x0[_t], m.x1[_t], m.x2[_t]]).reshape(1, 3)
-
-            # print(x_hat)
-
-            def _sindy_inverse_transform(x, idx):
-                x = (x - 1) * (self.sindy_dataMax[idx] - self.sindy_dataMin[idx]) + self.sindy_dataMin[idx]
-                return x
-            for idx in range(x_hat.shape[0]):
-                # x_hat[idx] = _sindy_inverse_transform(x_hat[idx], idx)
-                x_hat[idx] = (x_hat[idx] - 1) * (self.sindy_dataMax[idx] - self.sindy_dataMin[idx]) + self.sindy_dataMin[idx]
-
-            # print(x_hat)
-
-            # Forward pass
-            x_hat = x_hat @ W[0] + B[0]
-            for row in range(x_hat.shape[0]):
-                for col in range(x_hat.shape[1]):
-                    x_hat[row, col] = tanh(x_hat[row, col])
-
-            x_hat = x_hat @ W[1] + B[1]
-            for row in range(x_hat.shape[0]):
-                for col in range(x_hat.shape[1]):
-                    x_hat[row, col] = tanh(x_hat[row, col])
-
-            x_hat = x_hat @ W[2] + B[2]
-            for row in range(x_hat.shape[0]):
-                for col in range(x_hat.shape[1]):
-                    x_hat[row, col] = tanh(x_hat[row, col])
-
-            x_hat = x_hat @ W[3] + B[3]
-
-            # print(x_hat)
-
-            x_hat = np.array(x_hat).flatten()
-
-            def _ae_inverse_transform(x, idx):
-                x = (x - 1) * (self.ae_dataMax[idx] - self.ae_dataMin[idx]) + self.ae_dataMin[idx]
-                return x
-            for idx in range(x_hat.shape[0]):
-                x_hat[idx] = (x_hat[idx] - 1) * (self.ae_dataMax[idx] - self.ae_dataMin[idx]) + self.ae_dataMin[idx]
-                # x_hat[idx] = _ae_inverse_transform(x_hat[idx], idx)
-
-            # x_hat = self.sindy.x_rom_scaler.inverse_transform(x_hat)
-            # x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
-            x_hat = x_hat.flatten()
-
-            x5 = x_hat[5]
-
-            # print(x5)
-
-            x13 = x_hat[13]
-
-            # print(x13)
-
-            # Scale u0 and u1 into Sindy space for cost
-            u0_273 = self.sindy.u0_scaler.transform(np.array(273).reshape(-1, 1)).flatten()
-            u1_273 = self.sindy.u1_scaler.transform(np.array(273).reshape(-1, 1)).flatten()
-
-            return m.L_dot[_t] == setpoint_weight * ((x5 - 303) ** 2 + (x13 - 333) ** 2) \
-                   + controller_weight * ((m.u0[_t] - u0_273[0]) ** 2 + (m.u1[_t] - u1_273[0]) ** 2)
-
+            return m.L_dot[_t] \
+                   == setpoint_weight * ((m.x0[_t] - 0.70213366) ** 2
+                                         + (m.x1[_t] - 0.211213) ** 2
+                                         + (m.x2[_t] - 0.98931336) ** 2)
+                   # + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
+
 
         # Objective function is to minimize the Lagrangian cost integral
         def _objective(m):

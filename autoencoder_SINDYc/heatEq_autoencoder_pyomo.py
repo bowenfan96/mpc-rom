@@ -13,7 +13,7 @@ from pyomo.solvers import *
 from heatEq_autoencoder import *
 
 
-# THIN ROD WITH DIMENSIONALITY REDUCED FROM 20 TO 5
+# THIN ROD WITH DIMENSIONALITY REDUCED FROM 20 TO 3
 
 
 class HeatEqSimulator:
