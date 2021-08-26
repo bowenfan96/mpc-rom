@@ -160,7 +160,7 @@ class Autoencoder:
             self.decoder.train()
 
     def encode(self, dataframe):
-        print(dataframe)
+        # print(dataframe)
         x = self.transform_data_without_fit(dataframe)
         self.encoder.eval()
         with torch.no_grad():
@@ -174,7 +174,7 @@ class Autoencoder:
             x_rom_df_cols.append("x{}_rom".format(i))
         x_rom_df = pd.DataFrame(x_rom, columns=x_rom_df_cols)
 
-        print(x_rom_df)
+        # print(x_rom_df)
         return x_rom_df
 
     def decode(self, x_rom_nparr):
@@ -248,7 +248,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     x_rom_score = x_rom_scaler.transform(x_rom_score)
 
     # We need to split x_rom and u to into a list of 240 trajectories for sindy
-    num_trajectories = 1680
+    # num_trajectories = 1680
     num_trajectories = 240
     u0_list_fit = np.split(u0_fit, num_trajectories)
     u1_list_fit = np.split(u1_fit, num_trajectories)
@@ -297,7 +297,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     for i in range(20):
         x_init_df_col.append("x{}".format(i))
     x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
     x_rom_init = autoencoder.encode(x_init_df).to_numpy()
     x_rom_init_scaled = x_rom_scaler.transform(x_rom_init)
     print(x_rom_init_scaled)
@@ -345,36 +345,37 @@ def discover_objectives(ae_model):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("data/autoencoder_training_data.csv")
-    test_data = pd.read_csv("data/validation_dataset_3dim_wR_wPathCst.csv")
-    autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
-    autoencoder.fit(data, test_data)
-    with open("heatEq_autoencoder_3dim_tanh.pickle", "wb") as model:
-        pickle.dump(autoencoder, model)
+    # Training
+    # data = pd.read_csv("data/autoencoder_training_data.csv")
+    # test_data = pd.read_csv("data/validation_dataset_3dim_wR_wPathCst.csv")
+    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
+    # autoencoder.fit(data, test_data)
+    # with open("heatEq_autoencoder_3dim_tanh.pickle", "wb") as model:
+    #     pickle.dump(autoencoder, model)
 
-    # data_score = pd.read_csv("../heatEq_3dims_wR_wPathCst/heatEq_240_trajectories_df.csv")
-    # data_fit = pd.read_csv("../heatEq_3dims_wR_wPathCst/validation_dataset_3dim_wR_wPathCst.csv")
-    # autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
-    # sindy(autoencoder, data_fit, data_score)
-
+    data_fit = pd.read_csv("data/sindy_fit_data.csv")
+    data_score = pd.read_csv("data/sindy_validation_data.csv")
     autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
-    input_weight = autoencoder.decoder.input.weight.detach().cpu().numpy().T
-    input_bias = autoencoder.decoder.input.bias.detach().cpu().numpy().T
-    h1_weight = autoencoder.decoder.h1.weight.detach().cpu().numpy().T
-    h1_bias = autoencoder.decoder.h1.bias.detach().cpu().numpy().T
-    h2_weight = autoencoder.decoder.h2.weight.detach().cpu().numpy().T
-    h2_bias = autoencoder.decoder.h2.bias.detach().cpu().numpy().T
-    h3_weight = autoencoder.decoder.h3.weight.detach().cpu().numpy().T
-    h3_bias = autoencoder.decoder.h3.bias.detach().cpu().numpy().T
+    sindy(autoencoder, data_fit, data_score)
 
-    np.save("autoencoder_weights_biases_tanh/input_weight", input_weight)
-    np.save("autoencoder_weights_biases_tanh/input_bias", input_bias)
-    np.save("autoencoder_weights_biases_tanh/h1_weight", h1_weight)
-    np.save("autoencoder_weights_biases_tanh/h1_bias", h1_bias)
-    np.save("autoencoder_weights_biases_tanh/h2_weight", h2_weight)
-    np.save("autoencoder_weights_biases_tanh/h2_bias", h2_bias)
-    np.save("autoencoder_weights_biases_tanh/h3_weight", h3_weight)
-    np.save("autoencoder_weights_biases_tanh/h3_bias", h3_bias)
+    # autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
+    # input_weight = autoencoder.decoder.input.weight.detach().cpu().numpy().T
+    # input_bias = autoencoder.decoder.input.bias.detach().cpu().numpy().T
+    # h1_weight = autoencoder.decoder.h1.weight.detach().cpu().numpy().T
+    # h1_bias = autoencoder.decoder.h1.bias.detach().cpu().numpy().T
+    # h2_weight = autoencoder.decoder.h2.weight.detach().cpu().numpy().T
+    # h2_bias = autoencoder.decoder.h2.bias.detach().cpu().numpy().T
+    # h3_weight = autoencoder.decoder.h3.weight.detach().cpu().numpy().T
+    # h3_bias = autoencoder.decoder.h3.bias.detach().cpu().numpy().T
+    #
+    # np.save("autoencoder_weights_biases_tanh/input_weight", input_weight)
+    # np.save("autoencoder_weights_biases_tanh/input_bias", input_bias)
+    # np.save("autoencoder_weights_biases_tanh/h1_weight", h1_weight)
+    # np.save("autoencoder_weights_biases_tanh/h1_bias", h1_bias)
+    # np.save("autoencoder_weights_biases_tanh/h2_weight", h2_weight)
+    # np.save("autoencoder_weights_biases_tanh/h2_bias", h2_bias)
+    # np.save("autoencoder_weights_biases_tanh/h3_weight", h3_weight)
+    # np.save("autoencoder_weights_biases_tanh/h3_bias", h3_bias)
 
     # W = [input_weight, h1_weight, h2_weight, h3_weight]
     # B = [input_bias, h1_bias, h2_bias, h3_bias]
@@ -402,11 +403,11 @@ if __name__ == "__main__":
     # print("Autoencoder output")
     # print(autoencoder.decode(np.array([0.632633, -0.405015,  0.087859])))
     #
-    # x_init = np.full(shape=(1, 20), fill_value=273)
-    # df_cols = []
-    # for i in range(20):
-    #     df_cols.append("x{}".format(i))
-    # df = pd.DataFrame(x_init, columns=df_cols)
-    # x_rom = autoencoder.encode(df)
-    # print(x_rom)
+    x_init = np.full(shape=(1, 20), fill_value=273)
+    df_cols = []
+    for i in range(20):
+        df_cols.append("x{}".format(i))
+    df = pd.DataFrame(x_init, columns=df_cols)
+    x_rom = autoencoder.encode(df)
+    print(x_rom)
     #

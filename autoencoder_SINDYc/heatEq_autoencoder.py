@@ -467,12 +467,12 @@ if __name__ == "__main__":
 # return m.x2_dot[_t] = -0.615 1 + 0.955* self.model.x0[_t] + 0.906* self.model.x1[_t] + 2.317* self.model.x2[_t] + -4.927* self.model.u0[_t] + 1.063* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 0.264* self.model.x2[_t]**2 + 1.581* self.model.u0[_t]**2 + 0.677 *self.model.u1[_t]**2
 # 0.2593598175662833
 
-    data_score = pd.read_csv("../heatEq_3dims_wR_wPathCst/heatEq_240_trajectories_df.csv")
-    data_fit = pd.read_csv("../heatEq_3dims_wR_wPathCst/validation_dataset_3dim_wR_wPathCst.csv")
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
-    sindy(autoencoder, data_fit, data_score)
+    # data_score = pd.read_csv("../heatEq_3dims_wR_wPathCst/heatEq_240_trajectories_df.csv")
+    # data_fit = pd.read_csv("../heatEq_3dims_wR_wPathCst/validation_dataset_3dim_wR_wPathCst.csv")
+    # autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+    # sindy(autoencoder, data_fit, data_score)
 
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
     input_weight = autoencoder.decoder.input.weight.detach().cpu().numpy().T
     input_bias = autoencoder.decoder.input.bias.detach().cpu().numpy().T
     h1_weight = autoencoder.decoder.h1.weight.detach().cpu().numpy().T
@@ -524,4 +524,13 @@ if __name__ == "__main__":
     df = pd.DataFrame(x_init, columns=df_cols)
     x_rom = autoencoder.encode(df)
     print(x_rom)
+
+    x_init = np.full(shape=(1, 20), fill_value=333)
+    df_cols = []
+    for i in range(20):
+        df_cols.append("x{}".format(i))
+    df = pd.DataFrame(x_init, columns=df_cols)
+    x_rom = autoencoder.encode(df)
+    print(x_rom)
+    print(autoencoder.decode(np.array([1.210267, -0.655691,  0.278179])))
 

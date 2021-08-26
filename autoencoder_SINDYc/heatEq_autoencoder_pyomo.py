@@ -137,7 +137,7 @@ class HeatEqSimulator:
             x_hat = x_hat @ W[3] + B[3]
 
             x_hat = np.array(x_hat).flatten().reshape(1, 20)
-            x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
+            # x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
             x_hat = x_hat.flatten()
             return x_hat[5] <= 313
 
@@ -292,16 +292,6 @@ def load_pickle(filename):
 
 
 if __name__ == "__main__":
-    # generate_trajectories(save_csv=True)
-
-    # main_simple_sys = HeatEqSimulator()
-    # main_nn_model = load_pickle("simple_nn_controller.pickle")
-    # main_res, _ = main_simple_sys.simulate_system_nn_controls(main_nn_model)
-    # main_simple_sys.plot(main_res)
-    # print(main_res)
-
-    # replay("heatEq_240_trajectories_df.csv")
-
     heatEq_system = HeatEqSimulator()
     print(heatEq_system.mpc_control())
     main_res, _ = heatEq_system.parse_mpc_results()

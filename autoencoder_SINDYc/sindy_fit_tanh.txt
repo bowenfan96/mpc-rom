@@ -1,0 +1,7 @@
+Polynomial fit with degree 2:
+
+self.model.x0_dot[_t] == -2.3451 + 2.363*self.model.x0[_t]+ -1.165*self.model.x1[_t]+ 4.973*self.model.x2[_t]+ 0.898*self.model.u0[_t]+ -2.147*self.model.u1[_t]+ 2.287*self.model.x0[_t]**2+ -1.435*self.model.x1[_t]**2+ 0.172*self.model.x2[_t]**2+ -0.397*self.model.u0[_t]**2 + -0.419*self.model.u1[_t]**2
+self.model.x1_dot[_t] == -1.6051 + -0.642*self.model.x0[_t]+ 3.757*self.model.x1[_t]+ -0.899*self.model.x2[_t]+ -4.379*self.model.u0[_t]+ 1.715*self.model.u1[_t]+ 2.069*self.model.x0[_t]**2+ -0.634*self.model.x1[_t]**2+ 0.666*self.model.x2[_t]**2+ 1.280*self.model.u0[_t]**2
+self.model.x2_dot[_t] == 1.9491 + -2.702*self.model.x0[_t]+ 0.955*self.model.x1[_t]+ -3.871*self.model.x2[_t]+ -1.468*self.model.u0[_t]+ 3.302*self.model.u1[_t]+ -2.689*self.model.x0[_t]**2+ -0.039*self.model.x1[_t]**2+ 1.170*self.model.x2[_t]**2+ 0.418*self.model.u0[_t]**2 + 0.617*self.model.u1[_t]**2
+
+R2 score = 0.17267058446028913
