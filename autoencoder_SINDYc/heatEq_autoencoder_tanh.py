@@ -180,7 +180,7 @@ class Autoencoder:
     def decode(self, x_rom_nparr):
         # Expected shape of x_rom_nparr is (x_rom_dim, )
         # Reshape to match decoder dimensions
-        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(1, 3)
+        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 3)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -308,6 +308,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # Discover setpoint for x_rom
     x_rom_setpoints = discover_objectives(autoencoder)
     x_rom_setpoints_scaled = x_rom_scaler.transform(x_rom_setpoints)
+    print("x_rom_setpoints_scaled")
     print(x_rom_setpoints_scaled)
 
     # Discovered setpoints for x_rom (scaled)
@@ -340,6 +341,7 @@ def discover_objectives(ae_model):
     # This is our setpoint for the reduced model
     x_rom_setpoints = ae_model.encode(x_full_setpoint_df).to_numpy()
 
+    print("x_rom_setpoints")
     print(x_rom_setpoints)
     return x_rom_setpoints
 
@@ -357,6 +359,8 @@ if __name__ == "__main__":
     data_score = pd.read_csv("data/sindy_validation_data.csv")
     autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
     sindy(autoencoder, data_fit, data_score)
+
+    x_rom_setpoints = discover_objectives(autoencoder)
 
     # autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
     # input_weight = autoencoder.decoder.input.weight.detach().cpu().numpy().T
@@ -410,4 +414,3 @@ if __name__ == "__main__":
     df = pd.DataFrame(x_init, columns=df_cols)
     x_rom = autoencoder.encode(df)
     print(x_rom)
-    #

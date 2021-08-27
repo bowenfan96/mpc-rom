@@ -1,0 +1,7 @@
+#x0' = 7.873 1 + -5.435 x0 + -7.725 x1 + -6.196 x2 + 2.014 u0 + 1.843 u1 + -0.161 x0^2 + 1.419 x1^2 + -1.618 x2^2 + -0.166 u0^2 + 0.513 u1^2
+# x1' = -10.699 1 + 10.793 x0 + 9.294 x1 + 6.198 x2 + 1.789 u0 + -3.086 u1 + -2.686 x0^2 + -0.930 x1^2 + 1.490 x2^2 + -0.999 u0^2 + -1.779 u1^2
+# x2' = -0.615 1 + 0.955 x0 + 0.906 x1 + 2.317 x2 + -4.927 u0 + 1.063 x0^2 + -0.930 x1^2 + 0.264 x2^2 + 1.581 u0^2 + 0.677 u1^2
+# return m.x0_dot[_t] = 7.873 1 + -5.435* self.model.x0[_t] + -7.725* self.model.x1[_t] + -6.196* self.model.x2[_t] + 2.014* self.model.u0[_t] + 1.843* self.model.u1[_t] + -0.161* self.model.x0[_t]**2 + 1.419* self.model.x1[_t]**2 + -1.618* self.model.x2[_t]**2 + -0.166* self.model.u0[_t]**2 + 0.513 *self.model.u1[_t]**2
+# return m.x1_dot[_t] = -10.699 1 + 10.793* self.model.x0[_t] + 9.294* self.model.x1[_t] + 6.198* self.model.x2[_t] + 1.789* self.model.u0[_t] + -3.086* self.model.u1[_t] + -2.686* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 1.490* self.model.x2[_t]**2 + -0.999* self.model.u0[_t]**2 + -1.779 *self.model.u1[_t]**2
+# return m.x2_dot[_t] = -0.615 1 + 0.955* self.model.x0[_t] + 0.906* self.model.x1[_t] + 2.317* self.model.x2[_t] + -4.927* self.model.u0[_t] + 1.063* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 0.264* self.model.x2[_t]**2 + 1.581* self.model.u0[_t]**2 + 0.677 *self.model.u1[_t]**2
+# 0.2593598175662833

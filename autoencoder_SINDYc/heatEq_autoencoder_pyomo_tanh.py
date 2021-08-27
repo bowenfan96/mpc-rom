@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from heatEq_autoencoder import *
+from heatEq_autoencoder_tanh import *
 from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
@@ -76,6 +76,15 @@ class SINDYc:
         print(ae_model.scaler_x.data_max_)
         self.autoencoder_dataMax = np.array([437.6874, 410.5294, 389.3565, 372.7515, 359.7538, 349.6972, 342.1139, 336.6767, 333.1643, 331.4397, 331.4374, 333.1576, 336.6663, 342.1009, 349.6827, 359.7426, 372.7442, 389.352,  410.5268, 437.6862]).flatten()
 
+        # Bounds for u0
+        print("u0 bounds")
+        print(self.u0_scaler.transform(np.array(173).reshape(-1, 1)))
+        print(self.u0_scaler.transform(np.array(473).reshape(-1, 1)))
+        # Bounds for u1
+        print("u1 bounds")
+        print(self.u1_scaler.transform(np.array(173).reshape(-1, 1)))
+        print(self.u1_scaler.transform(np.array(473).reshape(-1, 1)))
+
     def fit(self):
         # ----- SINDY FROM PYSINDY -----
         # Get the polynomial feature library
@@ -132,8 +141,8 @@ class HeatEqSimulator:
         self.model.x2[0].fix(x_init[2])
 
         # Set up controls
-        self.model.u0 = Var(self.model.time)
-        self.model.u1 = Var(self.model.time)
+        self.model.u0 = Var(self.model.time, bounds=(0, 1))
+        self.model.u1 = Var(self.model.time, bounds=(0, 1))
 
         # ODEs
         # Set up x0_dot = Ax + Bu
@@ -250,12 +259,15 @@ class HeatEqSimulator:
 
         # self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
+        x_rom_setpoints = np.array([0.9302741, -0.6342127, -1.2024136]).reshape(-1, 3)
+        x_rom_setpoints = self.sindy.x_rom_scaler.transform(x_rom_setpoints).flatten()
+
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
-                   == setpoint_weight * ((m.x0[_t] - 0.70213366) ** 2
-                                         + (m.x1[_t] - 0.211213) ** 2
-                                         + (m.x2[_t] - 0.98931336) ** 2)
+                   == setpoint_weight * ((m.x0[_t] - x_rom_setpoints[0]) ** 2
+                                         + (m.x1[_t] - x_rom_setpoints[1]) ** 2
+                                         + (m.x2[_t] - x_rom_setpoints[2]) ** 2)
                    # + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
@@ -266,54 +278,54 @@ class HeatEqSimulator:
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
         # Constraint for x5 <= 313 K
-        def _constraint_x5(m, _t):
-            # Array of pyomo model variables
-            x_hat = np.array([m.x0[_t], m.x1[_t], m.x2[_t]]).reshape(1, 3)
-
-            def _sindy_inverse_transform(x, idx):
-                x = (x - 1) * (self.sindy_dataMax[idx] - self.sindy_dataMin[idx]) + self.sindy_dataMin[idx]
-                return x
-            for idx in range(x_hat.shape[0]):
-                x_hat[idx] = _sindy_inverse_transform(x_hat[idx], idx)
-
-            # Forward pass
-            x_hat = x_hat @ W[0] + B[0]
-            for row in range(x_hat.shape[0]):
-                for col in range(x_hat.shape[1]):
-                    x_hat[row, col] = tanh(x_hat[row, col])
-
-            x_hat = x_hat @ W[1] + B[1]
-            for row in range(x_hat.shape[0]):
-                for col in range(x_hat.shape[1]):
-                    x_hat[row, col] = tanh(x_hat[row, col])
-
-            x_hat = x_hat @ W[2] + B[2]
-            for row in range(x_hat.shape[0]):
-                for col in range(x_hat.shape[1]):
-                    x_hat[row, col] = tanh(x_hat[row, col])
-
-            x_hat = x_hat @ W[3] + B[3]
-
-            x_hat = np.array(x_hat).flatten()
-
-            def _ae_inverse_transform(x, idx):
-                x = (x - 1) * (self.ae_dataMax[idx] - self.ae_dataMin[idx]) + self.ae_dataMin[idx]
-                return x
-            for idx in range(x_hat.shape[0]):
-                x_hat[idx] = _ae_inverse_transform(x_hat[idx], idx)
-
-            # x_hat = self.sindy.x_rom_scaler.inverse_transform(x_hat)
-            # x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
-            x_hat = x_hat.flatten()
-            return x_hat[5] <= 313
-
-            # sindy scaler_x.inverse_transform
-            # return m.x0[_t] <= 313
-            # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))))
-            # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))) <= 313)
-            # return self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t])
-
-        self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
+        # def _constraint_x5(m, _t):
+        #     # Array of pyomo model variables
+        #     x_hat = np.array([m.x0[_t], m.x1[_t], m.x2[_t]]).reshape(1, 3)
+        #
+        #     def _sindy_inverse_transform(x, idx):
+        #         x = (x - 1) * (self.sindy_dataMax[idx] - self.sindy_dataMin[idx]) + self.sindy_dataMin[idx]
+        #         return x
+        #     for idx in range(x_hat.shape[0]):
+        #         x_hat[idx] = _sindy_inverse_transform(x_hat[idx], idx)
+        #
+        #     # Forward pass
+        #     x_hat = x_hat @ W[0] + B[0]
+        #     for row in range(x_hat.shape[0]):
+        #         for col in range(x_hat.shape[1]):
+        #             x_hat[row, col] = tanh(x_hat[row, col])
+        #
+        #     x_hat = x_hat @ W[1] + B[1]
+        #     for row in range(x_hat.shape[0]):
+        #         for col in range(x_hat.shape[1]):
+        #             x_hat[row, col] = tanh(x_hat[row, col])
+        #
+        #     x_hat = x_hat @ W[2] + B[2]
+        #     for row in range(x_hat.shape[0]):
+        #         for col in range(x_hat.shape[1]):
+        #             x_hat[row, col] = tanh(x_hat[row, col])
+        #
+        #     x_hat = x_hat @ W[3] + B[3]
+        #
+        #     x_hat = np.array(x_hat).flatten()
+        #
+        #     def _ae_inverse_transform(x, idx):
+        #         x = (x - 1) * (self.ae_dataMax[idx] - self.ae_dataMin[idx]) + self.ae_dataMin[idx]
+        #         return x
+        #     for idx in range(x_hat.shape[0]):
+        #         x_hat[idx] = _ae_inverse_transform(x_hat[idx], idx)
+        #
+        #     # x_hat = self.sindy.x_rom_scaler.inverse_transform(x_hat)
+        #     # x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
+        #     x_hat = x_hat.flatten()
+        #     return x_hat[5] <= 313
+        #
+        #     # sindy scaler_x.inverse_transform
+        #     # return m.x0[_t] <= 313
+        #     # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))))
+        #     # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))) <= 313)
+        #     # return self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t])
+        #
+        # self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form
@@ -366,6 +378,12 @@ class HeatEqSimulator:
         # Make sure all 11 time steps are recorded; this was problematic due to Pyomo's float indexing
         assert len(t) == 11
 
+        # Scale back everything
+        u0 = self.sindy.u0_scaler.inverse_transform(np.array(u0).reshape(-1, 1)).flatten()
+        u1 = self.sindy.u1_scaler.inverse_transform(np.array(u1).reshape(-1, 1)).flatten()
+        x = self.sindy.x_rom_scaler.inverse_transform(np.array(x).reshape(-1, 3))
+        x = self.autoencoder.decode(x)
+
         for time in range(len(t)):
             # Instantaneous cost is L[t1] - L[t0]
             if time == 0:
@@ -383,7 +401,7 @@ class HeatEqSimulator:
         x = np.array(x)
 
         df_data = {"t": t}
-        for x_idx in range(3):
+        for x_idx in range(20):
             df_data["x{}".format(x_idx)] = x[:, x_idx]
         df_data["u0"] = u0
         df_data["u1"] = u1
@@ -401,8 +419,8 @@ class HeatEqSimulator:
         ctg = dataframe["ctg"]
 
         # Plot x[5] and x[13], the elements whose temperatures we are trying to control
-        x5 = dataframe["x0"]
-        x13 = dataframe["x1"]
+        x5 = dataframe["x5"]
+        x13 = dataframe["x13"]
         u0 = dataframe["u0"]
         u1 = dataframe["u1"]
 
