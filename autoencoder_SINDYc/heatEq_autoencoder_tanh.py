@@ -50,11 +50,6 @@ class Encoder(nn.Module):
         xe3 = F.elu(self.h2(xe2))
         x_rom_out = (self.h3(xe3))
 
-        # xe1 = F.leaky_relu(self.input(x_in))
-        # xe2 = F.leaky_relu(self.h1(xe1))
-        # xe3 = F.leaky_relu(self.h2(xe2))
-        # x_rom_out = (self.h3(xe3))
-
         return x_rom_out
 
 
@@ -80,11 +75,6 @@ class Decoder(nn.Module):
         xe2 = torch.tanh(self.h1(xe1))
         xe3 = torch.tanh(self.h2(xe2))
         x_full_out = (self.h3(xe3))
-
-        # xe1 = F.leaky_relu(self.input(x_rom_in))
-        # xe2 = F.leaky_relu(self.h1(xe1))
-        # xe3 = F.leaky_relu(self.h2(xe2))
-        # x_full_out = (self.h3(xe3))
 
         return x_full_out
 
@@ -271,17 +261,18 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=2)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1)
     fourier_library = pysindy.FourierLibrary(n_frequencies=6)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
 
     # Smooth our possibly noisy data (as it is generated with random spiky controls) (doesn't work)
     smoothed_fd = pysindy.SmoothedFiniteDifference()
+    fd_drop_endpoints = pysindy.FiniteDifference(drop_endpoints=True)
 
     # Tell Sindy that the data is recorded at 0.1s intervals
     # sindy_model = pysindy.SINDy(t_default=0.1)
-    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library)
+    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library, differentiation_method=fd_drop_endpoints)
     # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
 
     # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
@@ -408,6 +399,14 @@ if __name__ == "__main__":
     # print(autoencoder.decode(np.array([0.632633, -0.405015,  0.087859])))
     #
     x_init = np.full(shape=(1, 20), fill_value=273)
+    df_cols = []
+    for i in range(20):
+        df_cols.append("x{}".format(i))
+    df = pd.DataFrame(x_init, columns=df_cols)
+    x_rom = autoencoder.encode(df)
+    print(x_rom)
+
+    x_init = np.full(shape=(1, 20), fill_value=333)
     df_cols = []
     for i in range(20):
         df_cols.append("x{}".format(i))

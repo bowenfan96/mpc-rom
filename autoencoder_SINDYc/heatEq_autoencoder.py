@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
 from pyomo.core import Expression
+from sklearn.linear_model import Lasso
 from torch.utils.data import DataLoader
 from torchinfo import summary
 import pickle
@@ -214,6 +215,7 @@ class Autoencoder:
         #     return pyomo.core.Constraint.Infeasible
         return Expression(rule=x5_decoded<=313)
 
+
 def load_pickle(filename):
     with open(filename, "rb") as model:
         pickled_autoencoder = pickle.load(model)
@@ -271,17 +273,18 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=2)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1)
     fourier_library = pysindy.FourierLibrary(n_frequencies=6)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
 
     # Smooth our possibly noisy data (as it is generated with random spiky controls) (doesn't work)
-    smoothed_fd = pysindy.SmoothedFiniteDifference()
+    smoothed_fd = pysindy.SmoothedFiniteDifference(drop_endpoints=True)
+    fd_drop_endpoints = pysindy.FiniteDifference(drop_endpoints=True)
 
     # Tell Sindy that the data is recorded at 0.1s intervals
     # sindy_model = pysindy.SINDy(t_default=0.1)
-    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library)
+    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library, differentiation_method=fd_drop_endpoints)
     # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
 
     # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
@@ -456,6 +459,17 @@ if __name__ == "__main__":
     sindy(autoencoder, data_fit, data_score)
 
     x_init = np.full(shape=(1, 20), fill_value=273)
+    df_cols = []
+    for i in range(20):
+        df_cols.append("x{}".format(i))
+    df = pd.DataFrame(x_init, columns=df_cols)
+    x_rom = autoencoder.encode(df)
+    print("x_rom initial")
+    print(x_rom)
+
+    x_init_1 = np.full(shape=(1, 10), fill_value=323)
+    x_init_2 = np.full(shape=(1, 10), fill_value=333)
+    x_init = np.hstack((x_init_1, x_init_2))
     df_cols = []
     for i in range(20):
         df_cols.append("x{}".format(i))

@@ -152,19 +152,16 @@ class HeatEqSimulator:
         # ODEs
         # Set up x0_dot = Ax + Bu
         def _ode_x0(m, _t):
-            return m.x0_dot[_t] == 7.8731 + -5.435* self.model.x0[_t] + -7.725* self.model.x1[_t] + -6.196* self.model.x2[_t] + 1.014* self.model.u0[_t] + 2.843* self.model.u1[_t] + -0.161* self.model.x0[_t]**2 + 1.419* self.model.x1[_t]**2 + -1.618* self.model.x2[_t]**2 + -0.166* self.model.u0[_t]**2 + 0.013 *self.model.u1[_t]**2
-            # return m.x0_dot[_t] == 7.8731 + -5.435* self.model.x0[_t] + -7.725* self.model.x1[_t] + -6.196* self.model.x2[_t] + 2.014* self.model.u0[_t] + 1.843* self.model.u1[_t] + -0.161* self.model.x0[_t]**2 + 1.419* self.model.x1[_t]**2 + -1.618* self.model.x2[_t]**2 + -0.166* self.model.u0[_t]**2 + 0.513 *self.model.u1[_t]**2
+            return m.x0_dot[_t] == 5.0731 + -4.247 * m.x0[_t] + -4.185 * m.x1[_t] + -5.120 * m.x2[_t] + 1.660 * m.u0[_t] + 1.912 * m.u1[_t]
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         # Set up x1_dot to x18_dot = Ax only
         def _ode_x1(m, _t):
-            return m.x1_dot[_t] == -10.6991 + 10.793* self.model.x0[_t] + 9.294* self.model.x1[_t] + 6.198* self.model.x2[_t] + 2.789* self.model.u0[_t] + -3.086* self.model.u1[_t] + -2.686* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 1.490* self.model.x2[_t]**2 + -0.999* self.model.u0[_t]**2 + 0.079 *self.model.u1[_t]**2
-            # return m.x1_dot[_t] == -10.6991 + 10.793* self.model.x0[_t] + 9.294* self.model.x1[_t] + 6.198* self.model.x2[_t] + 1.789* self.model.u0[_t] + -3.086* self.model.u1[_t] + -2.686* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 1.490* self.model.x2[_t]**2 + -0.999* self.model.u0[_t]**2 + -1.779 *self.model.u1[_t]**2
+            return m.x1_dot[_t] == -5.2891 + 4.750 * m.x0[_t] + 4.322 * m.x1[_t] + 4.983 * m.x2[_t] + 0.476 * m.u0[_t] + -3.631 * m.u1[_t]
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
         def _ode_x2(m, _t):
-            return m.x2_dot[_t] == -0.6151 + 0.955* self.model.x0[_t] + 0.906* self.model.x1[_t] + 2.317* self.model.x2[_t] + -6.927* self.model.u0[_t] + 1.063* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 0.264* self.model.x2[_t]**2 + 1.581* self.model.u0[_t]**2 + 0.677 *self.model.u1[_t]**2
-            # return m.x2_dot[_t] == -0.6151 + 0.955* self.model.x0[_t] + 0.906* self.model.x1[_t] + 2.317* self.model.x2[_t] + -4.927* self.model.u0[_t] + 1.063* self.model.x0[_t]**2 + -0.930* self.model.x1[_t]**2 + 0.264* self.model.x2[_t]**2 + 1.581* self.model.u0[_t]**2 + 0.677 *self.model.u1[_t]**2
+            return m.x2_dot[_t] == -0.3821 + 2.714 * m.x0[_t] + 0.405 * m.x2[_t] + -2.654 * m.u0[_t] + 0.533 * m.u1[_t]
         self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         # Lagrangian cost
@@ -179,10 +176,12 @@ class HeatEqSimulator:
         # We would like to minimize the controller costs too, in terms of how much heating or cooling is applied
 
         # Define weights for setpoint and controller objectives
-        setpoint_weight = 0.995
+        setpoint_weight = 0.2
         controller_weight = 1 - setpoint_weight
 
-        x_rom_setpoints = np.array([0.70213366, 0.211213, 0.98931336]).flatten()
+        # x_rom_setpoints = np.array([0.80213366, 0.211213, 0.98931336]).flatten()
+        x_rom_setpoints = np.array([1.4599, -0.639499, 0.160836]).flatten()
+        x_rom_setpoints = self.sindy.x_rom_scaler.transform(np.array(x_rom_setpoints).reshape(1, 3)).flatten()
 
         # Lagrangian cost
         def _Lagrangian(m, _t):
@@ -190,7 +189,7 @@ class HeatEqSimulator:
                    == setpoint_weight * ((m.x0[_t] - x_rom_setpoints[0]) ** 2
                                          + (m.x1[_t] - x_rom_setpoints[1]) ** 2
                                          + (m.x2[_t] - x_rom_setpoints[2]) ** 2) \
-                   + controller_weight * ((m.u0[_t] - 0.33340985) ** 2 + (m.u1[_t] - 0.33314682) ** 2)
+                   + controller_weight * ((m.u0[_t] - 0.6) ** 2 + (m.u1[_t] - 1) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
         # Objective function is to minimize the Lagrangian cost integral
@@ -199,57 +198,6 @@ class HeatEqSimulator:
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
         self.autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
-
-        # # Load extracted weights
-        # w1 = np.load("autoencoder_weights_biases/input_weight.npy")
-        # w2 = np.load("autoencoder_weights_biases/h1_weight.npy")
-        # w3 = np.load("autoencoder_weights_biases/h2_weight.npy")
-        # w4 = np.load("autoencoder_weights_biases/h3_weight.npy")
-        # # Load extracted biases
-        # b1 = np.load("autoencoder_weights_biases/input_bias.npy")
-        # b2 = np.load("autoencoder_weights_biases/h1_bias.npy")
-        # b3 = np.load("autoencoder_weights_biases/h2_bias.npy")
-        # b4 = np.load("autoencoder_weights_biases/h3_bias.npy")
-        #
-        # W = [w1, w2, w3, w4]
-        # B = [b1, b2, b3, b4]
-        #
-        # # Constraint for x5 <= 313 K
-        # def _constraint_x5(m, _t):
-        #     # Array of pyomo model variables
-        #     x_hat = np.array([m.x0[_t], m.x1[_t], m.x2[_t]]).reshape(1, 3)
-        #
-        #     # Forward pass
-        #     x_hat = x_hat @ W[0] + B[0]
-        #     for row in range(x_hat.shape[0]):
-        #         for col in range(x_hat.shape[1]):
-        #             x_hat[row, col] = tanh(x_hat[row, col])
-        #
-        #     x_hat = x_hat @ W[1] + B[1]
-        #     for row in range(x_hat.shape[0]):
-        #         for col in range(x_hat.shape[1]):
-        #             x_hat[row, col] = tanh(x_hat[row, col])
-        #
-        #     x_hat = x_hat @ W[2] + B[2]
-        #     for row in range(x_hat.shape[0]):
-        #         for col in range(x_hat.shape[1]):
-        #             x_hat[row, col] = tanh(x_hat[row, col])
-        #
-        #     x_hat = x_hat @ W[3] + B[3]
-        #
-        #     x_hat = np.array(x_hat).flatten().reshape(1, 20)
-        #     # x_hat = self.autoencoder.scaler_x.inverse_transform(x_hat)
-        #     x_hat = x_hat.flatten()
-        #     return x_hat[5] <= 313
-
-            # sindy scaler_x.inverse_transform
-            # return m.x0[_t] <= 313
-            # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))))
-            # print(self.autoencoder.decode(np.hstack((value(m.x0[_t]), value(m.x1[_t]), value(m.x2[_t])))) <= 313)
-            # return self.autoencoder.decode_pyomo(m.x0[_t], m.x1[_t], m.x2[_t])
-
-
-        # self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form

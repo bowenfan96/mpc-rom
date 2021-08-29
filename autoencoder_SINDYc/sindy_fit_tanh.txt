@@ -1,3 +1,5 @@
+----- BAD FIT DUE TO FORWARD DIFFERENCE ENDPOINTS -----
+
 Polynomial fit with degree 2:
 
 self.model.x0_dot[_t] == -2.3451 + 2.363*self.model.x0[_t]+ -1.165*self.model.x1[_t]+ 4.973*self.model.x2[_t]+ 0.898*self.model.u0[_t]+ -2.147*self.model.u1[_t]+ 2.287*self.model.x0[_t]**2+ -1.435*self.model.x1[_t]**2+ 0.172*self.model.x2[_t]**2+ -0.397*self.model.u0[_t]**2 + -0.419*self.model.u1[_t]**2
@@ -5,3 +7,16 @@ self.model.x1_dot[_t] == -1.6051 + -0.642*self.model.x0[_t]+ 3.757*self.model.x1
 self.model.x2_dot[_t] == 1.9491 + -2.702*self.model.x0[_t]+ 0.955*self.model.x1[_t]+ -3.871*self.model.x2[_t]+ -1.468*self.model.u0[_t]+ 3.302*self.model.u1[_t]+ -2.689*self.model.x0[_t]**2+ -0.039*self.model.x1[_t]**2+ 1.170*self.model.x2[_t]**2+ 0.418*self.model.u0[_t]**2 + 0.617*self.model.u1[_t]**2
 
 R2 score = 0.17267058446028913
+
+
+----- DEGREE 1 FIT AFTER DROPPING ENDPOINTS -----
+x0' = -1.959 1 + 3.261 x0 + -3.469 x1 + 5.779 x2 + 0.513 u0 + -1.672 u1
+x1' = -0.759 1 + 1.243 x0 + 0.619 x1 + 0.349 x2 + -2.548 u0 + 1.129 u1
+x2' = 2.133 1 + -3.858 x0 + 1.087 x1 + -3.432 x2 + -0.829 u0 + 2.771 u1
+
+m.x0_dot[_t] == -1.9591 + 3.261 * m.x0[_t] + -3.469 * m.x1[_t] + 5.779 * m.x2[_t] + 0.513  * m.u0[_t]  + -1.672  * m.u1[_t]
+m.x1_dot[_t] == -0.7591 + 1.243 * m.x0[_t] + 0.619 * m.x1[_t] + 0.349 * m.x2[_t] + -2.548  * m.u0[_t]  + 1.129  * m.u1[_t]
+m.x2_dot[_t] == 2.1331 + -3.858 * m.x0[_t] + 1.087 * m.x1[_t] + -3.432 * m.x2[_t] + -0.829  * m.u0[_t]  + 2.771  * m.u1[_t]
+
+
+0.5360360682502155

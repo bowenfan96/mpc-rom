@@ -278,6 +278,8 @@ class HeatEqSimulator:
     def mpc_control(self):
         mpc_solver = SolverFactory("ipopt", tee=True)
         mpc_results = mpc_solver.solve(self.model)
+        print(mpc_results)
+        self.model.display()
 
         return mpc_results
 
@@ -455,9 +457,14 @@ class HeatEqSimulator:
         # Pyomo does not support simulating step by step, so we need to run 11 simulation loops
         # At loop i, we get state x_i and discard subsequent states
         # We call the neural net to predict the optimal u for x_i, then fix u time i
+        time_total = 0
+        import time
         for i in range(11):
             # Fetch optimal action, u, by calling the neural net with current_x
+            time_start = time.time()
             u_opt = nn_model.get_u_opt(current_x)
+            time_end = time.time()
+            time_total = time_total + (time_end - time_start)
 
             # Replace the control sequence of the current timestep with u_opt
             u0_nn[i] = u_opt[0]
@@ -500,6 +507,8 @@ class HeatEqSimulator:
             if i < 10:
                 for j in range(20):
                     current_x[j] = x[j][i+1]
+
+        print(time_total)
 
         # Make dataframe from the final simulator results
         t = deduplicate_df["t"]
@@ -834,11 +843,16 @@ def replay(trajectory_df_filename, buffer_capacity=360):
     return
 
 
+def timetest():
+    # heatEq_system.mpc_control()
+    main_res, _ = main_simple_sys.simulate_system_nn_controls(main_nn_model)
+
+
 if __name__ == "__main__":
     # generate_trajectories(save_csv=True)
 
-    # main_simple_sys = HeatEqSimulator()
-    # main_nn_model = load_pickle("simple_nn_controller.pickle")
+    main_simple_sys = HeatEqSimulator()
+    main_nn_model = load_pickle("heatEq_nn_controller_5dim.pickle")
     # main_res, _ = main_simple_sys.simulate_system_nn_controls(main_nn_model)
     # main_simple_sys.plot(main_res)
     # print(main_res)
@@ -852,8 +866,12 @@ if __name__ == "__main__":
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
-    heatEq_system = HeatEqSimulator()
-    heatEq_system.mpc_control()
-    main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system = HeatEqSimulator()
+    # heatEq_system.mpc_control()
+    # main_res, _ = heatEq_system.parse_mpc_results()
     # main_res.to_csv("FOM_results.csv")
-    heatEq_system.plot(main_res)
+    # heatEq_system.plot(main_res)
+
+    import timeit
+    timer = timeit.timeit("timetest()", setup="from __main__ import timetest", number=1)
+    print(timer)

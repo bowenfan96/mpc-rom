@@ -849,6 +849,10 @@ def replay(trajectory_df_filename, buffer_capacity=360):
     return
 
 
+def timetest():
+    heatEq_system.mpc_control()
+
+
 if __name__ == "__main__":
     # generate_trajectories(save_csv=True)
 
@@ -868,7 +872,11 @@ if __name__ == "__main__":
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
     heatEq_system = HeatEqSimulator()
-    heatEq_system.mpc_control()
-    heatEq_system.model.display()
+    # heatEq_system.mpc_control()
+    # heatEq_system.model.display()
     # main_res, _ = heatEq_system.parse_mpc_results()
     # heatEq_system.plot(main_res)
+
+    import timeit
+    timer = timeit.timeit("timetest()", setup="from __main__ import timetest", number=1)
+    print(timer)

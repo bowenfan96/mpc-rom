@@ -1,3 +1,4 @@
+import time
 from itertools import chain
 
 import torch
@@ -215,7 +216,7 @@ class HeatEqNNController:
         else:
             return ctg_pred, cst_pred
 
-    def get_u_opt(self, x, mode="grid"):
+    def get_u_opt(self, x, mode="basinhopper"):
         x = np.array(x).flatten()
 
         if mode == "grid":
@@ -267,12 +268,14 @@ class HeatEqNNController:
 
             # Configure options for the local minimizer (Powell)
             gd_options = {}
-            # gd_options["maxiter"] = 2
+            gd_options["maxiter"] = 10
             # gd_options["disp"] = True
             # gd_options["eps"] = 1
 
             # Specify bounds to send to the Powell minimizer
             bounds = optimize.Bounds(lb=np.array([173, 173], dtype=int), ub=np.array([373, 373], dtype=int))
+
+            time_start = time.time()
 
             # Powell is chosen because it is the only gradientless method that can handle bounds
             # We need to it to gradientless because our input to output mapping is not differentiable
@@ -283,7 +286,7 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=10, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
             )
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
@@ -306,6 +309,9 @@ class HeatEqNNController:
                 best_u_with_noise[1] = 73
             best_u_with_noise[0] = int(best_u_with_noise[0])
             best_u_with_noise[1] = int(best_u_with_noise[1])
+
+            time_end = time.time()
+            print(time_end - time_start)
 
             return best_u_with_noise
 
