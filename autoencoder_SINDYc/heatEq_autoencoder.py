@@ -92,7 +92,7 @@ class Decoder(nn.Module):
 
 
 class Autoencoder:
-    def __init__(self, x_dim, x_rom_dim=2):
+    def __init__(self, x_dim, x_rom_dim=5):
         self.encoder = Encoder(x_dim, x_rom_dim)
         self.decoder = Decoder(x_dim, x_rom_dim)
 
@@ -458,7 +458,7 @@ if __name__ == "__main__":
 
     data = pd.read_csv("data/autoencoder_training_data.csv")
     test_data = pd.read_csv("data/sindy_validation_data.csv")
-    autoencoder = Autoencoder(x_dim=20, x_rom_dim=2)
+    autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
     autoencoder.fit(data, test_data)
     # with open("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle", "wb") as model:
     #     pickle.dump(autoencoder, model)
