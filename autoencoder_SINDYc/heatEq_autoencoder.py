@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from matplotlib import pyplot as plt
 from pyomo.core import Expression
 from sklearn.linear_model import Lasso
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from torch.utils.data import DataLoader
 from torchinfo import summary
 import pickle
@@ -91,7 +92,7 @@ class Decoder(nn.Module):
 
 
 class Autoencoder:
-    def __init__(self, x_dim, x_rom_dim=3):
+    def __init__(self, x_dim, x_rom_dim=2):
         self.encoder = Encoder(x_dim, x_rom_dim)
         self.decoder = Decoder(x_dim, x_rom_dim)
 
@@ -273,8 +274,8 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1)
-    fourier_library = pysindy.FourierLibrary(n_frequencies=6)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1, include_bias=True)
+    fourier_library = pysindy.FourierLibrary(n_frequencies=2)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
 
@@ -290,7 +291,15 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
     sindy_model.fit(x=x_rom_list_fit, u=u_list_fit, multiple_trajectories=True)
     sindy_model.print()
-    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True)
+
+    print("R2")
+    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True, metric=r2_score)
+    print(score)
+    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True, metric=mean_squared_error)
+    print("MSE")
+    print(score)
+    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True, metric=mean_absolute_error)
+    print("MAE")
     print(score)
 
 
@@ -311,18 +320,19 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # Discover setpoint for x_rom
     x_rom_setpoints = discover_objectives(autoencoder)
     x_rom_setpoints_scaled = x_rom_scaler.transform(x_rom_setpoints)
+    print("Setpoints")
     print(x_rom_setpoints_scaled)
 
     # Discovered setpoints for x_rom (scaled)
     # 0.70213366 0.211213   0.98931336
 
-    # Decode
-    x_final = np.array([0.6878071340000952, 0.22097627550550195, 1.04697611250378], dtype=np.float32).reshape(1, 3)
-    x_final = x_rom_scaler.inverse_transform(x_final)
-    x_final = torch.tensor(x_final)
-    x_final = autoencoder.decode(x_final)
-    print("Final state")
-    print(x_final)
+    # # Decode
+    # x_final = np.array([0.6878071340000952, 0.22097627550550195, 1.04697611250378], dtype=np.float32).reshape(1, 3)
+    # x_final = x_rom_scaler.inverse_transform(x_final)
+    # x_final = torch.tensor(x_final)
+    # x_final = autoencoder.decode(x_final)
+    # print("Final state")
+    # print(x_final)
 
     return
 
@@ -331,10 +341,10 @@ def discover_objectives(ae_model):
     # Encode the final full state of the MPC controlled system
     x_full_setpoint_dict = {}
 
-    x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
-         302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
-         320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
-         327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
+    x = [312.043309, 308.530539, 305.935527, 304.179534, 303.210444,
+         302.999869, 303.541685, 304.851730, 306.968621, 309.955792,
+         313.904979, 318.941577, 325.232511, 332.997712, 342.526917,
+         354.204601, 368.547821, 386.265378, 408.354234, 436.265516]
 
     for i in range(20):
         x_full_setpoint_dict["x{}".format(i)] = x[i]
@@ -446,11 +456,11 @@ if __name__ == "__main__":
     # generate_data_for_svm()
     # run_svm()
 
-    # data = pd.read_csv("data/autoencoder_training_data.csv")
-    # test_data = pd.read_csv("validation_dataset_3dim_wR_wPathCst.csv")
-    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
-    # autoencoder.fit(data, test_data)
-    # with open("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle", "wb") as model:
+    data = pd.read_csv("data/autoencoder_training_data.csv")
+    test_data = pd.read_csv("data/sindy_validation_data.csv")
+    autoencoder = Autoencoder(x_dim=20, x_rom_dim=2)
+    autoencoder.fit(data, test_data)
+    # with open("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle", "wb") as model:
     #     pickle.dump(autoencoder, model)
 
     data_fit = pd.read_csv("data/sindy_fit_data.csv")
@@ -459,17 +469,6 @@ if __name__ == "__main__":
     sindy(autoencoder, data_fit, data_score)
 
     x_init = np.full(shape=(1, 20), fill_value=273)
-    df_cols = []
-    for i in range(20):
-        df_cols.append("x{}".format(i))
-    df = pd.DataFrame(x_init, columns=df_cols)
-    x_rom = autoencoder.encode(df)
-    print("x_rom initial")
-    print(x_rom)
-
-    x_init_1 = np.full(shape=(1, 10), fill_value=323)
-    x_init_2 = np.full(shape=(1, 10), fill_value=333)
-    x_init = np.hstack((x_init_1, x_init_2))
     df_cols = []
     for i in range(20):
         df_cols.append("x{}".format(i))

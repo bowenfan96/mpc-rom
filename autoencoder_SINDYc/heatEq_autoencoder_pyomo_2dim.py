@@ -13,7 +13,7 @@ from pyomo.solvers import *
 from heatEq_autoencoder import *
 
 
-# THIN ROD WITH DIMENSIONALITY REDUCED FROM 20 TO 3
+# THIN ROD WITH DIMENSIONALITY REDUCED FROM 20 TO 2
 
 
 class SINDYc:
@@ -93,7 +93,7 @@ class SINDYc:
         # ----- SINDY FROM PYSINDY -----
         # Get the polynomial feature library
         # include_interaction = False precludes terms like x0x1, x2x3
-        poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=2)
+        poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1)
         fourier_library = pysindy.FourierLibrary(n_frequencies=6)
         identity_library = pysindy.IdentityLibrary()
         combined_library = poly_library + fourier_library + identity_library
@@ -121,7 +121,7 @@ class HeatEqSimulator:
         # ----- SET UP SINDY -----
         data_fit = pd.read_csv("data/sindy_fit_data.csv")
         data_score = pd.read_csv("data/sindy_validation_data.csv")
-        self.autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
+        self.autoencoder = load_pickle("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle")
         self.sindy = SINDYc(self.autoencoder, data_fit, data_score)
         self.sindy.fit()
 
@@ -132,8 +132,7 @@ class HeatEqSimulator:
 
         # Initial state: the rod is 273 Kelvins throughout (all x_full = 273)
         # Initial values for x_rom - SCALED FOR SINDY
-        x_init = [0.632633, -0.405015, 0.087859]
-        x_init = self.sindy.x_rom_scaler.transform(np.array(x_init).reshape(1, 3)).flatten()
+        x_init = [0.6722082, 0.68439853]
 
         self.model.x0 = Var(self.model.time)
         self.model.x0_dot = DerivativeVar(self.model.x0, wrt=self.model.time)
@@ -142,43 +141,26 @@ class HeatEqSimulator:
         self.model.x1_dot = DerivativeVar(self.model.x1, wrt=self.model.time)
         self.model.x1[0].fix(x_init[1])
         self.model.x2 = Var(self.model.time)
-        self.model.x2_dot = DerivativeVar(self.model.x2, wrt=self.model.time)
-        self.model.x2[0].fix(x_init[2])
 
         # Set up controls
         self.model.u0 = Var(self.model.time, bounds=(0, 1))
         self.model.u1 = Var(self.model.time, bounds=(0, 1))
 
+        # x0' = 0.822 1 + 0.273 x0 + 0.153 x1 + -3.215 u0 + 0.209 u1
+        # x1' = 1.463 1 + 0.108 x1 + -0.980 u0 + -2.683 u1
+
         # ODEs
         # Set up x0_dot = Ax + Bu
         def _ode_x0(m, _t):
-            # return m.x0_dot[_t] == 5.0731 + -4.247 * m.x0[_t] + -4.185 * m.x1[_t] + -5.120 * m.x2[_t] + 1.660 * m.u0[_t] + 1.912 * m.u1[_t]
-            # return m.x0_dot[_t] == -0.183 * m.x0[_t] + -0.779 * m.x1[_t] + -2.254 * m.x2[_t] + 1.815 * m.u0[_t] + 2.126 * m.u1[_t]
-            return m.x0_dot[_t] == 5.1361 + -3.034 * m.x0[_t] + -5.217 * m.x1[_t] + -5.103 * m.x2[_t] + 1.150 * m.u0[
-                _t] + 1.912 * m.u1[_t] + -1.408 * m.x0[_t] ** 2 + 1.003 * m.x1[_t] ** 2 + -0.041 * m.x2[
-                       _t] ** 2 + 0.588 * m.u0[_t] ** 2
-            # return m.x0_dot[_t] == 5.0731 + -4.247 * m.x0[_t] + -4.185 * m.x1[_t] + -5.120 * m.x2[_t] + 1.660 * m.u0[_t] + 1.912 * m.u1[_t]
+            # return m.x0_dot[_t] == 0.745 * m.x0[_t] + 0.701 * m.x1[_t] + -2.987 * m.u0[_t] + 0.448 * m.u1[_t]
+            return m.x0_dot[_t] == 0.8221 + 0.273 * m.x0[_t] + 0.153 * m.x1[_t] + -3.215 * m.u0[_t] + 0.209 * m.u1[_t]
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         def _ode_x1(m, _t):
-            # return m.x1_dot[_t] == -5.2891 + 4.750 * m.x0[_t] + 4.322 * m.x1[_t] + 4.983 * m.x2[_t] + 0.476 * m.u0[_t] + -3.631 * m.u1[_t]
-            # return m.x1_dot[_t] == 0.512 * m.x0[_t] + 0.770 * m.x1[_t] + 1.995 * m.x2[_t] + 0.314 * m.u0[_t] + -3.854 * \
-            #        m.u1[_t]
-            return m.x1_dot[_t] == -5.6361 + 4.676 * m.x0[_t] + 5.571 * m.x1[_t] + 4.397 * m.x2[_t] + 1.434 * m.u0[
-                _t] + -3.253 * m.u1[_t] + 0.098 * m.x0[_t] ** 2 + -1.173 * m.x1[_t] ** 2 + 0.617 * m.x2[
-                       _t] ** 2 + -1.078 * m.u0[_t] ** 2 + -0.376 * m.u1[_t] ** 2
-            # return m.x1_dot[_t] == -5.2891 + 4.750 * m.x0[_t] + 4.322 * m.x1[_t] + 4.983 * m.x2[_t] + 0.476 * m.u0[_t] + -3.631 * m.u1[_t]
+            # return m.x1_dot[_t] == 0.789 * m.x0[_t] + 1.123 * m.x1[_t] + -0.565 * m.u0[_t] + -2.250 * m.u1[_t]
+            return m.x1_dot[_t] == 1.4631 + 0.108 * m.x0[_t] + -0.980 * m.u0[_t] + -2.683 * m.u1[_t]
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
-        def _ode_x2(m, _t):
-            # return m.x2_dot[_t] == -0.3821 + 2.714 * m.x0[_t] + 0.405 * m.x2[_t] + -2.654 * m.u0[_t] + 0.533 * m.u1[_t]
-            # return m.x2_dot[_t] == 2.409 * m.x0[_t] + -0.265 * m.x1[_t] + 0.192 * m.x2[_t] + -2.663 * m.u0[_t] + 0.519 * \
-            #        m.u1[_t]
-            return m.x2_dot[_t] == -0.4431 + 2.612 * m.x0[_t] + -0.434 * m.x1[_t] + 1.809 * m.x2[_t] + -2.977 * m.u0[
-                _t] + 0.125 * m.u1[_t] + 0.146 * m.x0[_t] ** 2 + 0.369 * m.x1[_t] ** 2 + -1.434 * m.x2[
-                       _t] ** 2 + 0.361 * m.u0[_t] ** 2 + 0.409 * m.u1[_t] ** 2
-            # return m.x2_dot[_t] == -0.3821 + 2.714 * m.x0[_t] + 0.405 * m.x2[_t] + -2.654 * m.u0[_t] + 0.533 * m.u1[_t]
-        self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         # Lagrangian cost
         self.model.L = Var(self.model.time)
@@ -196,15 +178,14 @@ class HeatEqSimulator:
         controller_weight = 1 - setpoint_weight
 
         # Already scaled for Sindy, don't scale again
-        x_rom_setpoints = np.array([0.8678726, -0.08192372, 0.8913181]).flatten()
+        x_rom_setpoints = np.array([0.4113798, 0.00419229]).flatten()
 
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
                    == setpoint_weight * ((m.x0[_t] - x_rom_setpoints[0]) ** 2
-                                         + (m.x1[_t] - x_rom_setpoints[1]) ** 2
-                                         + (m.x2[_t] - x_rom_setpoints[2]) ** 2)
-                   # + controller_weight * (2*(m.u0[_t] - 0.33) ** 2 + 10*(m.u1[_t] - 1) ** 2)
+                                         + (m.x1[_t] - x_rom_setpoints[1]) ** 2)\
+                   + controller_weight * (2*(m.u0[_t] - 0.33) ** 2 + 10*(m.u1[_t] - 1) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
         # Objective function is to minimize the Lagrangian cost integral
@@ -212,7 +193,7 @@ class HeatEqSimulator:
             return m.L[m.time.last()] - m.L[0]
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
-        self.autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
+        self.autoencoder = load_pickle("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle")
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form
@@ -261,7 +242,6 @@ class HeatEqSimulator:
                 temp_x = []
                 temp_x.append(value(self.model.x0[time]))
                 temp_x.append(value(self.model.x1[time]))
-                temp_x.append(value(self.model.x2[time]))
                 x.append(temp_x)
 
         # Make sure all 11 time steps are recorded; this was problematic due to Pyomo's float indexing
@@ -348,7 +328,7 @@ class HeatEqSimulator:
         # Scale back everything
         u0 = self.sindy.u0_scaler.inverse_transform(np.array(u0_nn).reshape(-1, 1)).flatten()
         u1 = self.sindy.u1_scaler.inverse_transform(np.array(u1_nn).reshape(-1, 1)).flatten()
-        x_temp = self.sindy.x_rom_scaler.inverse_transform(np.array(x).reshape(-1, 3))
+        x_temp = self.sindy.x_rom_scaler.inverse_transform(np.array(x).reshape(-1, 2))
         x_temp = self.autoencoder.decode(x_temp)
 
         print(x)
@@ -442,15 +422,15 @@ class HeatEqSimulator:
         axs[2].step(t, u1, label="$u_1$")
         axs[2].legend()
 
-        fig.suptitle("Sindy MPC performance as seen in the ROM system\n "
-                     "Reduced from 20 to 3 states using autoencoder"
+        fig.suptitle("Sindy MPC performance as seen in the ROM system\n"
+                     "Reduced from 20 to 2 states using autoencoder"
                      .format(num_rounds, num_run_in_round, total_cost, cst_status))
         plt.xlabel("Time")
 
         # Save plot with autogenerated filename
         # svg_filename = results_folder + "Round {} Run {} Cost {} Constraint {}"\
         #     .format(num_rounds, num_run_in_round, total_cost, cst_status) + ".svg"
-        plt.savefig(fname="Sindy.svg", format="svg")
+        # plt.savefig(fname="Sindy.svg", format="svg")
 
         plt.show()
         # plt.close()
