@@ -460,8 +460,8 @@ if __name__ == "__main__":
     test_data = pd.read_csv("data/sindy_validation_data.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
     autoencoder.fit(data, test_data)
-    # with open("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle", "wb") as model:
-    #     pickle.dump(autoencoder, model)
+    with open("heatEq_autoencoder_5dim_lr001_batch100_epoch2000.pickle", "wb") as model:
+        pickle.dump(autoencoder, model)
 
     # data_fit = pd.read_csv("data/sindy_fit_data.csv")
     # data_score = pd.read_csv("data/sindy_validation_data.csv")
