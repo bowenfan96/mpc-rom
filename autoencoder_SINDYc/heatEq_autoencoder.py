@@ -182,7 +182,7 @@ class Autoencoder:
     def decode(self, x_rom_nparr):
         # Expected shape of x_rom_nparr is (x_rom_dim, )
         # Reshape to match decoder dimensions
-        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 3)
+        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 2)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -197,7 +197,7 @@ class Autoencoder:
         x1 = value(x1)
         x2 = value(x2)
 
-        x_rom_nparr = np.array([x0, x1, x2], dtype=np.float32).flatten().reshape(1, 3)
+        x_rom_nparr = np.array([x0, x1, x2], dtype=np.float32).flatten().reshape(1, 2)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -274,8 +274,8 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1, include_bias=True)
-    fourier_library = pysindy.FourierLibrary(n_frequencies=2)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=True, degree=2, include_bias=True)
+    fourier_library = pysindy.FourierLibrary(n_frequencies=3)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
 
@@ -309,7 +309,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     for i in range(20):
         x_init_df_col.append("x{}".format(i))
     x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle")
     x_rom_init = autoencoder.encode(x_init_df).to_numpy()
     x_rom_init_scaled = x_rom_scaler.transform(x_rom_init)
     print(x_rom_init_scaled)
@@ -460,19 +460,19 @@ if __name__ == "__main__":
     test_data = pd.read_csv("data/sindy_validation_data.csv")
     autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
     autoencoder.fit(data, test_data)
-    # with open("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle", "wb") as model:
+    # with open("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle", "wb") as model:
     #     pickle.dump(autoencoder, model)
 
-    data_fit = pd.read_csv("data/sindy_fit_data.csv")
-    data_score = pd.read_csv("data/sindy_validation_data.csv")
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
-    sindy(autoencoder, data_fit, data_score)
+    # data_fit = pd.read_csv("data/sindy_fit_data.csv")
+    # data_score = pd.read_csv("data/sindy_validation_data.csv")
+    # autoencoder = load_pickle("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle")
+    # sindy(autoencoder, data_fit, data_score)
 
-    x_init = np.full(shape=(1, 20), fill_value=273)
-    df_cols = []
-    for i in range(20):
-        df_cols.append("x{}".format(i))
-    df = pd.DataFrame(x_init, columns=df_cols)
-    x_rom = autoencoder.encode(df)
-    print("x_rom initial")
-    print(x_rom)
+    # x_init = np.full(shape=(1, 20), fill_value=273)
+    # df_cols = []
+    # for i in range(20):
+    #     df_cols.append("x{}".format(i))
+    # df = pd.DataFrame(x_init, columns=df_cols)
+    # x_rom = autoencoder.encode(df)
+    # print("x_rom initial")
+    # print(x_rom)
