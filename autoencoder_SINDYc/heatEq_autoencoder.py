@@ -92,7 +92,7 @@ class Decoder(nn.Module):
 
 
 class Autoencoder:
-    def __init__(self, x_dim, x_rom_dim=5):
+    def __init__(self, x_dim, x_rom_dim=3):
         self.encoder = Encoder(x_dim, x_rom_dim)
         self.decoder = Decoder(x_dim, x_rom_dim)
 
@@ -182,7 +182,7 @@ class Autoencoder:
     def decode(self, x_rom_nparr):
         # Expected shape of x_rom_nparr is (x_rom_dim, )
         # Reshape to match decoder dimensions
-        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 2)
+        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 3)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -197,7 +197,7 @@ class Autoencoder:
         x1 = value(x1)
         x2 = value(x2)
 
-        x_rom_nparr = np.array([x0, x1, x2], dtype=np.float32).flatten().reshape(1, 2)
+        x_rom_nparr = np.array([x0, x1, x2], dtype=np.float32).flatten().reshape(1, 3)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -253,6 +253,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # We need to split x_rom and u to into a list of 240 trajectories for sindy
     num_trajectories = 1680
     num_trajectories = 240
+    num_trajectories = 180
     u0_list_fit = np.split(u0_fit, num_trajectories)
     u1_list_fit = np.split(u1_fit, num_trajectories)
     u_list_fit = []
@@ -261,6 +262,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     x_rom_list_fit = np.split(x_rom_fit, num_trajectories, axis=0)
 
     num_trajectories = 240
+    num_trajectories = 20
     u0_list_score = np.split(u0_score, num_trajectories)
     u1_list_score = np.split(u1_score, num_trajectories)
     u_list_score = []
@@ -274,7 +276,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=True, degree=2, include_bias=True)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1, include_bias=True)
     fourier_library = pysindy.FourierLibrary(n_frequencies=3)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
@@ -309,9 +311,10 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     for i in range(20):
         x_init_df_col.append("x{}".format(i))
     x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
-    autoencoder = load_pickle("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
     x_rom_init = autoencoder.encode(x_init_df).to_numpy()
     x_rom_init_scaled = x_rom_scaler.transform(x_rom_init)
+    print("x_init - scaled for sindy dont scale again")
     print(x_rom_init_scaled)
     # Initial values for x_rom (scaled for Sindy):
     #      x0_rom     x1_rom        x2_rom
@@ -320,7 +323,126 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # Discover setpoint for x_rom
     x_rom_setpoints = discover_objectives(autoencoder)
     x_rom_setpoints_scaled = x_rom_scaler.transform(x_rom_setpoints)
-    print("Setpoints")
+    print("Setpoints - scaled for sindy dont scale again")
+    print(x_rom_setpoints_scaled)
+
+    # Discovered setpoints for x_rom (scaled)
+    # 0.70213366 0.211213   0.98931336
+
+    # # Decode
+    # x_final = np.array([0.6878071340000952, 0.22097627550550195, 1.04697611250378], dtype=np.float32).reshape(1, 3)
+    # x_final = x_rom_scaler.inverse_transform(x_final)
+    # x_final = torch.tensor(x_final)
+    # x_final = autoencoder.decode(x_final)
+    # print("Final state")
+    # print(x_final)
+
+    return
+
+def sindy_fom(dataframe_fit, dataframe_score):
+    # x_rom from autoencoder, returned as dataframe with shape (2400, 10)
+    x_fit = []
+    for i in range(20):
+        x_fit.append(dataframe_fit["x{}".format(i)].to_numpy())
+    x_rom_fit = np.array(x_fit).transpose()
+    x_score = []
+    for i in range(20):
+        x_score.append(dataframe_score["x{}".format(i)].to_numpy())
+    x_rom_score = np.array(x_score).transpose()
+
+    # Sindy needs to know the controller signals
+    u0_fit = dataframe_fit["u0"].to_numpy().flatten().reshape(-1, 1)
+    u1_fit = dataframe_fit["u1"].to_numpy().flatten().reshape(-1, 1)
+    u0_score = dataframe_score["u0"].to_numpy().flatten().reshape(-1, 1)
+    u1_score = dataframe_score["u1"].to_numpy().flatten().reshape(-1, 1)
+
+    # Try to scale everything to the same scale
+    u0_scaler = preprocessing.MinMaxScaler()
+    u1_scaler = preprocessing.MinMaxScaler()
+    x_rom_scaler = preprocessing.MinMaxScaler()
+    u0_scaler.fit(u0_fit)
+    u1_scaler.fit(u1_fit)
+    x_rom_scaler.fit(x_rom_fit)
+
+    u0_fit = u0_scaler.transform(u0_fit)
+    u0_score = u0_scaler.transform(u0_score)
+    u1_fit = u1_scaler.transform(u1_fit)
+    u1_score = u1_scaler.transform(u1_score)
+    x_rom_fit = x_rom_scaler.transform(x_rom_fit)
+    x_rom_score = x_rom_scaler.transform(x_rom_score)
+
+    # We need to split x_rom and u to into a list of 240 trajectories for sindy
+    num_trajectories = 1680
+    num_trajectories = 180
+    u0_list_fit = np.split(u0_fit, num_trajectories)
+    u1_list_fit = np.split(u1_fit, num_trajectories)
+    u_list_fit = []
+    for u0_fit, u1_fit in zip(u0_list_fit, u1_list_fit):
+        u_list_fit.append(np.hstack((u0_fit.reshape(-1, 1), u1_fit.reshape(-1, 1))))
+    x_rom_list_fit = np.split(x_rom_fit, num_trajectories, axis=0)
+
+    num_trajectories = 60
+    u0_list_score = np.split(u0_score, num_trajectories)
+    u1_list_score = np.split(u1_score, num_trajectories)
+    u_list_score = []
+    for u0_score, u1_score in zip(u0_list_score, u1_list_score):
+        u_list_score.append(np.hstack((u0_score.reshape(-1, 1), u1_score.reshape(-1, 1))))
+    x_rom_list_score = np.split(x_rom_score, num_trajectories, axis=0)
+
+    # print(u_list_fit)
+    # print(u_list_score)
+
+    # ----- SINDY FROM PYSINDY -----
+    # Get the polynomial feature library
+    # include_interaction = False precludes terms like x0x1, x2x3
+    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1, include_bias=False)
+    fourier_library = pysindy.FourierLibrary(n_frequencies=3)
+    identity_library = pysindy.IdentityLibrary()
+    combined_library = poly_library + fourier_library + identity_library
+
+    # Smooth our possibly noisy data (as it is generated with random spiky controls) (doesn't work)
+    smoothed_fd = pysindy.SmoothedFiniteDifference(drop_endpoints=True)
+    fd_drop_endpoints = pysindy.FiniteDifference(drop_endpoints=True)
+
+    # Tell Sindy that the data is recorded at 0.1s intervals
+    # sindy_model = pysindy.SINDy(t_default=0.1)
+    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library, differentiation_method=fd_drop_endpoints)
+    # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
+
+    # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
+    sindy_model.fit(x=x_rom_list_fit, u=u_list_fit, multiple_trajectories=True)
+    sindy_model.print()
+
+    print("R2")
+    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True, metric=r2_score)
+    print(score)
+    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True, metric=mean_squared_error)
+    print("MSE")
+    print(score)
+    score = sindy_model.score(x=x_rom_list_score, u=u_list_score, multiple_trajectories=True, metric=mean_absolute_error)
+    print("MAE")
+    print(score)
+
+
+    # Get x_rom initial values
+    x_init = np.full(shape=(1, 20), fill_value=273)
+    x_init_df_col = []
+    for i in range(20):
+        x_init_df_col.append("x{}".format(i))
+    x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
+    x_rom_init = autoencoder.encode(x_init_df).to_numpy()
+    x_rom_init_scaled = x_rom_scaler.transform(x_rom_init)
+    print("x_init - scaled for sindy dont scale again")
+    print(x_rom_init_scaled)
+    # Initial values for x_rom (scaled for Sindy):
+    #      x0_rom     x1_rom        x2_rom
+    #   0.2628937  0.6858409  0.44120657
+
+    # Discover setpoint for x_rom
+    x_rom_setpoints = discover_objectives(autoencoder)
+    x_rom_setpoints_scaled = x_rom_scaler.transform(x_rom_setpoints)
+    print("Setpoints - scaled for sindy dont scale again")
     print(x_rom_setpoints_scaled)
 
     # Discovered setpoints for x_rom (scaled)
@@ -337,14 +459,20 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     return
 
 
+
 def discover_objectives(ae_model):
     # Encode the final full state of the MPC controlled system
     x_full_setpoint_dict = {}
 
-    x = [312.043309, 308.530539, 305.935527, 304.179534, 303.210444,
-         302.999869, 303.541685, 304.851730, 306.968621, 309.955792,
-         313.904979, 318.941577, 325.232511, 332.997712, 342.526917,
-         354.204601, 368.547821, 386.265378, 408.354234, 436.265516]
+    # x = [312.043309, 308.530539, 305.935527, 304.179534, 303.210444,
+    #      302.999869, 303.541685, 304.851730, 306.968621, 309.955792,
+    #      313.904979, 318.941577, 325.232511, 332.997712, 342.526917,
+    #      354.204601, 368.547821, 386.265378, 408.354234, 436.265516]
+
+    x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
+         302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
+         320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
+         327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
 
     for i in range(20):
         x_full_setpoint_dict["x{}".format(i)] = x[i]
@@ -358,7 +486,7 @@ def discover_objectives(ae_model):
 
 
 def generate_data_for_svm():
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_lr001_batch100_epoch2000.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
 
     num_samples = 3000
 
@@ -456,17 +584,18 @@ if __name__ == "__main__":
     # generate_data_for_svm()
     # run_svm()
 
-    data = pd.read_csv("data/autoencoder_training_data.csv")
-    test_data = pd.read_csv("data/sindy_validation_data.csv")
-    autoencoder = Autoencoder(x_dim=20, x_rom_dim=5)
-    autoencoder.fit(data, test_data)
-    with open("heatEq_autoencoder_5dim_lr001_batch100_epoch2000.pickle", "wb") as model:
-        pickle.dump(autoencoder, model)
+    # data = pd.read_csv("data/mpc_data8.csv")
+    # test_data = pd.read_csv("data/mpc_data9.csv")
+    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
+    # autoencoder.fit(data, test_data)
+    # with open("heatEq_autoencoder_3dim_elu_mpcData.pickle", "wb") as model:
+    #     pickle.dump(autoencoder, model)
 
-    # data_fit = pd.read_csv("data/sindy_fit_data.csv")
-    # data_score = pd.read_csv("data/sindy_validation_data.csv")
-    # autoencoder = load_pickle("heatEq_autoencoder_2dim_lr001_batch100_epoch2000.pickle")
-    # sindy(autoencoder, data_fit, data_score)
+    data_fit = pd.read_csv("data/mpc_data8.csv")
+    data_score = pd.read_csv("data/mpc_data9.csv")
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
+    sindy(autoencoder, data_fit, data_score)
+    # sindy_fom(data_fit, data_score)
 
     # x_init = np.full(shape=(1, 20), fill_value=273)
     # df_cols = []

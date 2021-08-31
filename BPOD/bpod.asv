@@ -111,15 +111,15 @@ subplot(2,2,1)
 stairs(y1(:,1,1),'LineWidth',2);
 hold on
 stairs(y5(:,1,1),'LineWidth',1.);
-ylabel('y_0')
-title('u_0')
+ylabel('y_1')
+title('u_1')
 set(gca,'XLim',[0 60]);
 grid on
 subplot(2,2,2)
 stairs(y1(:,1,2),'LineWidth',2);
 hold on
 stairs(y5(:,1,2),'LineWidth',1.);
-title('u_1')
+title('u_2')
 set(gca,'XLim',[0 60]);
 grid on
 subplot(2,2,3)
@@ -127,7 +127,7 @@ stairs(y1(:,2,1),'LineWidth',2);
 hold on
 stairs(y5(:,2,1),'LineWidth',1.);
 xlabel('t')
-ylabel('y_1')
+ylabel('y_2')
 set(gca,'XLim',[0 60]);
 grid on
 subplot(2,2,4)

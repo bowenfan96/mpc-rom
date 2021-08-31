@@ -10,6 +10,10 @@ from pyomo.environ import *
 from pyomo.dae import *
 from pyomo.solvers import *
 
+import pysindy
+from sklearn import preprocessing
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
 from heatEq_autoencoder import *
 
 
@@ -46,6 +50,7 @@ class SINDYc:
         # We need to split x_rom and u to into a list of 240 trajectories for sindy
         # num_trajectories = 1680
         num_trajectories = 240
+        num_trajectories = 180
         u0_list_fit = np.split(u0_fit, num_trajectories)
         u1_list_fit = np.split(u1_fit, num_trajectories)
         self.u_list_fit = []
@@ -54,6 +59,7 @@ class SINDYc:
         self.x_rom_list_fit = np.split(x_rom_fit, num_trajectories, axis=0)
 
         num_trajectories = 240
+        num_trajectories = 20
         u0_list_score = np.split(u0_score, num_trajectories)
         u1_list_score = np.split(u1_score, num_trajectories)
         self.u_list_score = []
@@ -89,11 +95,94 @@ class SINDYc:
         print(self.u0_scaler.transform(np.array(273).reshape(-1, 1)))
         print(self.u1_scaler.transform(np.array(273).reshape(-1, 1)))
 
+        # ----- SINDY FROM PYSINDY -----
+        # Get the polynomial feature library
+        # include_interaction = False precludes terms like x0x1, x2x3
+        poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1, include_bias=True)
+        fourier_library = pysindy.FourierLibrary(n_frequencies=3)
+        identity_library = pysindy.IdentityLibrary()
+        combined_library = poly_library + fourier_library + identity_library
+
+        # Smooth our possibly noisy data (as it is generated with random spiky controls) (doesn't work)
+        smoothed_fd = pysindy.SmoothedFiniteDifference(drop_endpoints=True)
+        fd_drop_endpoints = pysindy.FiniteDifference(drop_endpoints=True)
+
+        # Tell Sindy that the data is recorded at 0.1s intervals
+        # sindy_model = pysindy.SINDy(t_default=0.1)
+        sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library,
+                                    differentiation_method=fd_drop_endpoints)
+        # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
+
+        # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
+        sindy_model.fit(x=self.x_rom_list_fit, u=self.u_list_fit, multiple_trajectories=True)
+        sindy_model.print()
+
+        print("R2")
+        score = sindy_model.score(x=self.x_rom_list_score, u=self.u_list_score, multiple_trajectories=True, metric=r2_score)
+        print(score)
+        score = sindy_model.score(x=self.x_rom_list_score, u=self.u_list_score, multiple_trajectories=True,
+                                  metric=mean_squared_error)
+        print("MSE")
+        print(score)
+        score = sindy_model.score(x=self.x_rom_list_score, u=self.u_list_score, multiple_trajectories=True,
+                                  metric=mean_absolute_error)
+        print("MAE")
+        print(score)
+
+        # Get x_rom initial values
+        x_init = np.full(shape=(1, 20), fill_value=273)
+        x_init_df_col = []
+        for i in range(20):
+            x_init_df_col.append("x{}".format(i))
+        x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
+        x_rom_init = ae_model.encode(x_init_df).to_numpy()
+        x_rom_init_scaled = self.x_rom_scaler.transform(x_rom_init)
+        print("x_init - scaled for sindy dont scale again")
+        print(x_rom_init_scaled)
+        # Initial values for x_rom (scaled for Sindy):
+        #      x0_rom     x1_rom        x2_rom
+        #   0.2628937  0.6858409  0.44120657
+
+        def discover_objectives(ae_model):
+            # Encode the final full state of the MPC controlled system
+            x_full_setpoint_dict = {}
+
+            # x = [312.043309, 308.530539, 305.935527, 304.179534, 303.210444,
+            #      302.999869, 303.541685, 304.851730, 306.968621, 309.955792,
+            #      313.904979, 318.941577, 325.232511, 332.997712, 342.526917,
+            #      354.204601, 368.547821, 386.265378, 408.354234, 436.265516]
+
+            x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
+                 302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
+                 320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
+                 327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
+
+            for i in range(20):
+                x_full_setpoint_dict["x{}".format(i)] = x[i]
+
+            x_full_setpoint_df = pd.DataFrame(x_full_setpoint_dict, index=[0])
+            # This is our setpoint for the reduced model
+            x_rom_setpoints = ae_model.encode(x_full_setpoint_df).to_numpy()
+
+            print(x_rom_setpoints)
+            return x_rom_setpoints
+
+        # Discover setpoint for x_rom
+        x_rom_setpoints = discover_objectives(ae_model)
+        x_rom_setpoints_scaled = self.x_rom_scaler.transform(x_rom_setpoints)
+        print("Setpoints - scaled for sindy dont scale again")
+        print(x_rom_setpoints_scaled)
+
+        print("setpoint check")
+        sp_check = self.x_rom_scaler.inverse_transform(x_rom_setpoints_scaled)
+        sp_check = ae_model.decode(sp_check)
+        print(sp_check)
+
     def fit(self):
         # ----- SINDY FROM PYSINDY -----
         # Get the polynomial feature library
         # include_interaction = False precludes terms like x0x1, x2x3
-        poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=2)
+        poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1)
         fourier_library = pysindy.FourierLibrary(n_frequencies=6)
         identity_library = pysindy.IdentityLibrary()
         combined_library = poly_library + fourier_library + identity_library
@@ -119,11 +208,11 @@ class HeatEqSimulator:
         print("Model uid", self.uid)
 
         # ----- SET UP SINDY -----
-        data_fit = pd.read_csv("data/sindy_fit_data.csv")
-        data_score = pd.read_csv("data/sindy_validation_data.csv")
-        self.autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
+        data_fit = pd.read_csv("data/mpc_data8.csv")
+        data_score = pd.read_csv("data/mpc_data9.csv")
+        self.autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
         self.sindy = SINDYc(self.autoencoder, data_fit, data_score)
-        self.sindy.fit()
+        # self.sindy.fit()
 
         # ----- SET UP THE BASIC MODEL -----
         # Set up pyomo model structure
@@ -132,8 +221,8 @@ class HeatEqSimulator:
 
         # Initial state: the rod is 273 Kelvins throughout (all x_full = 273)
         # Initial values for x_rom - SCALED FOR SINDY
-        x_init = [0.632633, -0.405015, 0.087859]
-        x_init = self.sindy.x_rom_scaler.transform(np.array(x_init).reshape(1, 3)).flatten()
+        x_init = [0.24526705, 0.4376421, 0.6805489]
+        # x_init = self.sindy.x_rom_scaler.transform(np.array(x_init).reshape(1, 3)).flatten()
 
         self.model.x0 = Var(self.model.time)
         self.model.x0_dot = DerivativeVar(self.model.x0, wrt=self.model.time)
@@ -154,30 +243,59 @@ class HeatEqSimulator:
         def _ode_x0(m, _t):
             # return m.x0_dot[_t] == 5.0731 + -4.247 * m.x0[_t] + -4.185 * m.x1[_t] + -5.120 * m.x2[_t] + 1.660 * m.u0[_t] + 1.912 * m.u1[_t]
             # return m.x0_dot[_t] == -0.183 * m.x0[_t] + -0.779 * m.x1[_t] + -2.254 * m.x2[_t] + 1.815 * m.u0[_t] + 2.126 * m.u1[_t]
-            return m.x0_dot[_t] == 5.1361 + -3.034 * m.x0[_t] + -5.217 * m.x1[_t] + -5.103 * m.x2[_t] + 1.150 * m.u0[
-                _t] + 1.912 * m.u1[_t] + -1.408 * m.x0[_t] ** 2 + 1.003 * m.x1[_t] ** 2 + -0.041 * m.x2[
-                       _t] ** 2 + 0.588 * m.u0[_t] ** 2
+            # return m.x0_dot[_t] == 5.1361 + -3.034 * m.x0[_t] + -5.217 * m.x1[_t] + -5.103 * m.x2[_t] + 1.150 * m.u0[
+            #     _t] + 1.912 * m.u1[_t] + -1.408 * m.x0[_t] ** 2 + 1.003 * m.x1[_t] ** 2 + -0.041 * m.x2[
+            #            _t] ** 2 + 0.588 * m.u0[_t] ** 2
             # return m.x0_dot[_t] == 5.0731 + -4.247 * m.x0[_t] + -4.185 * m.x1[_t] + -5.120 * m.x2[_t] + 1.660 * m.u0[_t] + 1.912 * m.u1[_t]
+            # return m.x0_dot[_t] == -734.6721 + 745.348 * m.x0[_t] + -123.692 * m.x1[_t] + 4.556 * m.x2[_t] + 31.146 * m.u0[_t] + 869.477 * m.u1[
+            #     _t] + -387.245 * m.x0[_t] ** 2 + 319.104 * m.x1[_t] ** 2 + -42.697 * m.x2[_t] ** 2 + -28.211 * m.u0[
+            #     _t] ** 2 + -473.354 * m.u1[_t] ** 2
+
+            # return m.x0_dot[_t] == -923.8941 + 1206.832 * m.x0[_t] + -927.010 * m.x1[_t] + 1043.816 * m.x2[
+            #     _t] + 59.017 * m.u0[_t] + 372.986 * m.u1[_t] + -73.160 * m.x0[_t] ** 2 + 76.628 * m.x1[
+            #            _t] ** 2 + 228.190 * m.x2[_t] ** 2 + -51.896 * m.u0[_t] ** 2 + -195.016 * m.u1[_t] ** 2
+            return m.x0_dot[_t] == -402.4941 + 662.805 * m.x0[_t] + -546.759 * m.x1[_t] + 653.530 * m.x2[_t] + -12.755 * m.u0[_t] + -6.532 * m.u1[_t]
+
         self.model.x0_ode = Constraint(self.model.time, rule=_ode_x0)
 
         def _ode_x1(m, _t):
             # return m.x1_dot[_t] == -5.2891 + 4.750 * m.x0[_t] + 4.322 * m.x1[_t] + 4.983 * m.x2[_t] + 0.476 * m.u0[_t] + -3.631 * m.u1[_t]
             # return m.x1_dot[_t] == 0.512 * m.x0[_t] + 0.770 * m.x1[_t] + 1.995 * m.x2[_t] + 0.314 * m.u0[_t] + -3.854 * \
             #        m.u1[_t]
-            return m.x1_dot[_t] == -5.6361 + 4.676 * m.x0[_t] + 5.571 * m.x1[_t] + 4.397 * m.x2[_t] + 1.434 * m.u0[
-                _t] + -3.253 * m.u1[_t] + 0.098 * m.x0[_t] ** 2 + -1.173 * m.x1[_t] ** 2 + 0.617 * m.x2[
-                       _t] ** 2 + -1.078 * m.u0[_t] ** 2 + -0.376 * m.u1[_t] ** 2
+            # return m.x1_dot[_t] == -5.6361 + 4.676 * m.x0[_t] + 5.571 * m.x1[_t] + 4.397 * m.x2[_t] + 1.434 * m.u0[
+            #     _t] + -3.253 * m.u1[_t] + 0.098 * m.x0[_t] ** 2 + -1.173 * m.x1[_t] ** 2 + 0.617 * m.x2[
+            #            _t] ** 2 + -1.078 * m.u0[_t] ** 2 + -0.376 * m.u1[_t] ** 2
             # return m.x1_dot[_t] == -5.2891 + 4.750 * m.x0[_t] + 4.322 * m.x1[_t] + 4.983 * m.x2[_t] + 0.476 * m.u0[_t] + -3.631 * m.u1[_t]
+            # return m.x1_dot[_t] == 285.8761 + -401.751 * m.x0[_t] + 172.525 * m.x1[_t] + 2.643 * m.x2[_t] + -59.595 * \
+            #        m.u0[_t] + -325.323 * m.u1[_t] + 227.118 * m.x0[_t] ** 2 + -239.132 * m.x1[_t] ** 2 + 41.582 * m.x2[
+            #            _t] ** 2 + 44.023 * m.u0[_t] ** 2 + 199.471 * m.u1[_t] ** 2
+
+            # return m.x1_dot[_t] == 81.4341 + -32.890 * m.x0[_t] + -9.754 * m.x1[_t] + 27.205 * m.x2[_t] + -40.751 * \
+            #        m.u0[_t] + -106.102 * m.u1[_t] + 37.445 * m.x0[_t] ** 2 + -54.795 * m.x1[_t] ** 2 + -35.073 * m.x2[
+            #            _t] ** 2 + 12.901 * m.u0[_t] ** 2 + 52.763 * m.u1[_t] ** 2
+            return m.x1_dot[_t] == 231.1121 + -327.134 * m.x0[_t] + 238.453 * m.x1[_t] + -332.937 * m.x2[_t] + -24.560 * \
+                   m.u0[_t] + 0.191 * m.u1[_t]
+
         self.model.x1_ode = Constraint(self.model.time, rule=_ode_x1)
 
         def _ode_x2(m, _t):
             # return m.x2_dot[_t] == -0.3821 + 2.714 * m.x0[_t] + 0.405 * m.x2[_t] + -2.654 * m.u0[_t] + 0.533 * m.u1[_t]
             # return m.x2_dot[_t] == 2.409 * m.x0[_t] + -0.265 * m.x1[_t] + 0.192 * m.x2[_t] + -2.663 * m.u0[_t] + 0.519 * \
             #        m.u1[_t]
-            return m.x2_dot[_t] == -0.4431 + 2.612 * m.x0[_t] + -0.434 * m.x1[_t] + 1.809 * m.x2[_t] + -2.977 * m.u0[
-                _t] + 0.125 * m.u1[_t] + 0.146 * m.x0[_t] ** 2 + 0.369 * m.x1[_t] ** 2 + -1.434 * m.x2[
-                       _t] ** 2 + 0.361 * m.u0[_t] ** 2 + 0.409 * m.u1[_t] ** 2
+            # return m.x2_dot[_t] == -0.4431 + 2.612 * m.x0[_t] + -0.434 * m.x1[_t] + 1.809 * m.x2[_t] + -2.977 * m.u0[
+            #     _t] + 0.125 * m.u1[_t] + 0.146 * m.x0[_t] ** 2 + 0.369 * m.x1[_t] ** 2 + -1.434 * m.x2[
+            #            _t] ** 2 + 0.361 * m.u0[_t] ** 2 + 0.409 * m.u1[_t] ** 2
             # return m.x2_dot[_t] == -0.3821 + 2.714 * m.x0[_t] + 0.405 * m.x2[_t] + -2.654 * m.u0[_t] + 0.533 * m.u1[_t]
+            # return m.x2_dot[_t] == -552.0021 + -227.093 * m.x0[_t] + -26.395 * m.x1[_t] + 110.932 * m.x2[
+            #     _t] + -246.631 * m.u0[_t] + 1446.692 * m.u1[_t] + 187.557 * m.x0[_t] ** 2 + 310.368 * m.x1[
+            #            _t] ** 2 + -134.280 * m.x2[_t] ** 2 + 150.075 * m.u0[_t] ** 2 + -764.306 * m.u1[_t] ** 2
+
+            # return m.x2_dot[_t] == 1064.3401 + -1553.184 * m.x0[_t] + 1200.244 * m.x1[_t] + -1370.385 * m.x2[
+            #     _t] + -105.131 * m.u0[_t] + -174.782 * m.u1[_t] + 83.840 * m.x0[_t] ** 2 + -116.776 * m.x1[
+            #            _t] ** 2 + -276.851 * m.x2[_t] ** 2 + 80.258 * m.u0[_t] ** 2 + 92.311 * m.u1[_t] ** 2
+            return m.x2_dot[_t] == 454.4931 + -715.484 * m.x0[_t] + 570.027 * m.x1[_t] + -714.559 * m.x2[_t] + -5.487 * \
+                   m.u0[_t] + 5.762 * m.u1[_t]
+
         self.model.x2_ode = Constraint(self.model.time, rule=_ode_x2)
 
         # Lagrangian cost
@@ -196,7 +314,7 @@ class HeatEqSimulator:
         controller_weight = 1 - setpoint_weight
 
         # Already scaled for Sindy, don't scale again
-        x_rom_setpoints = np.array([0.8678726, -0.08192372, 0.8913181]).flatten()
+        x_rom_setpoints = np.array([0.910533, 0.5825242, 0.18727982]).flatten()
 
         # Lagrangian cost
         def _Lagrangian(m, _t):
@@ -212,7 +330,7 @@ class HeatEqSimulator:
             return m.L[m.time.last()] - m.L[0]
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
-        self.autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mse_0.000498.pickle")
+        self.autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form

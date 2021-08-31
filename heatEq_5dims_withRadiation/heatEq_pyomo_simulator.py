@@ -46,6 +46,8 @@ class HeatEqSimulator:
         # Multiply constant to all elements in A
         self.A = c * A_mat
 
+        print(self.A)
+
         # Generate B matrix
         # Two sources of heat at each end of the rod
         num_heaters = 2
@@ -56,6 +58,8 @@ class HeatEqSimulator:
         B_mat[N - 1][num_heaters - 1] = 1
         # Multiply constant to all elements in B
         self.B = c * B_mat
+
+        print(self.B)
 
         # ----- SET UP THE BASIC MODEL -----
         # Set up pyomo model structure
