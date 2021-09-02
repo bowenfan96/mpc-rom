@@ -1,30 +1,17 @@
-import pyomo.core
-import sklearn.metrics
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from matplotlib import pyplot as plt
-from pyomo.core import Expression
-from torch.utils.data import DataLoader
-from torchinfo import summary
 import pickle
+
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import pysindy
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from pyomo.core import Expression
+from pyomo.environ import value
 from sklearn import metrics
 from sklearn import preprocessing
-import pysindy
-
-from sklearn.preprocessing import PolynomialFeatures
-from deeptime.sindy import STLSQ
-from deeptime.sindy import SINDy
-
-from scipy import optimize
-
-from sklearn import svm
-
-from pyomo.environ import value
+from torch.utils.data import DataLoader
 
 
 class Encoder(nn.Module):
@@ -80,7 +67,7 @@ class Decoder(nn.Module):
 
 
 class Autoencoder:
-    def __init__(self, x_dim, x_rom_dim=3):
+    def __init__(self, x_dim, x_rom_dim=1):
         self.encoder = Encoder(x_dim, x_rom_dim)
         self.decoder = Decoder(x_dim, x_rom_dim)
 
@@ -118,7 +105,7 @@ class Autoencoder:
         self.encoder.train()
         self.decoder.train()
 
-        mb_loader = torch.utils.data.DataLoader(x, batch_size=100, shuffle=True)
+        mb_loader = torch.utils.data.DataLoader(x, batch_size=100, shuffle=False)
 
         param_wrapper = nn.ParameterList()
         param_wrapper.extend(self.encoder.parameters())
@@ -170,7 +157,7 @@ class Autoencoder:
     def decode(self, x_rom_nparr):
         # Expected shape of x_rom_nparr is (x_rom_dim, )
         # Reshape to match decoder dimensions
-        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 3)
+        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 1)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -185,7 +172,7 @@ class Autoencoder:
         x1 = value(x1)
         x2 = value(x2)
 
-        x_rom_nparr = np.array([x0, x1, x2], dtype=np.float32).flatten().reshape(1, 3)
+        x_rom_nparr = np.array([x0, x1, x2], dtype=np.float32).flatten().reshape(1, 1)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -239,7 +226,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
 
     # We need to split x_rom and u to into a list of 240 trajectories for sindy
     # num_trajectories = 1680
-    num_trajectories = 240
+    num_trajectories = 400
     u0_list_fit = np.split(u0_fit, num_trajectories)
     u1_list_fit = np.split(u1_fit, num_trajectories)
     u_list_fit = []
@@ -247,7 +234,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
         u_list_fit.append(np.hstack((u0_fit.reshape(-1, 1), u1_fit.reshape(-1, 1))))
     x_rom_list_fit = np.split(x_rom_fit, num_trajectories, axis=0)
 
-    num_trajectories = 240
+    num_trajectories = 100
     u0_list_score = np.split(u0_score, num_trajectories)
     u1_list_score = np.split(u1_score, num_trajectories)
     u_list_score = []
@@ -272,7 +259,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
 
     # Tell Sindy that the data is recorded at 0.1s intervals
     # sindy_model = pysindy.SINDy(t_default=0.1)
-    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library, differentiation_method=fd_drop_endpoints)
+    sindy_model = pysindy.SINDy(t_default=0.1, feature_library=poly_library)
     # sindy_model = pysindy.SINDy(t_default=0.1, differentiation_method=smoothed_fd)
 
     # sindy_model.fit(x=x_rom, u=np.hstack((u0.reshape(-1, 1), u1.reshape(-1, 1))))
@@ -291,6 +278,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
     x_rom_init = autoencoder.encode(x_init_df).to_numpy()
     x_rom_init_scaled = x_rom_scaler.transform(x_rom_init)
+    print("xInitScaled")
     print(x_rom_init_scaled)
     # Initial values for x_rom (scaled for Sindy):
     #      x0_rom     x1_rom        x2_rom
@@ -320,10 +308,14 @@ def discover_objectives(ae_model):
     # Encode the final full state of the MPC controlled system
     x_full_setpoint_dict = {}
 
-    x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
-         302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
-         320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
-         327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
+    # x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
+    #      302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
+    #      320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
+    #      327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
+    x = [312.043309, 308.530539, 305.935527, 304.179534, 303.210444,
+         302.999869, 303.541685, 304.851730, 306.968621, 309.955792,
+         313.904979, 318.941577, 325.232511, 332.997712, 342.526917,
+         354.204601, 368.547821, 386.265378, 408.354234, 436.265516]
 
     for i in range(20):
         x_full_setpoint_dict["x{}".format(i)] = x[i]
@@ -339,38 +331,38 @@ def discover_objectives(ae_model):
 
 if __name__ == "__main__":
     # Training
-    # data = pd.read_csv("data/autoencoder_training_data.csv")
-    # test_data = pd.read_csv("data/validation_dataset_3dim_wR_wPathCst.csv")
-    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
-    # autoencoder.fit(data, test_data)
+    data = pd.read_csv("data/mpc_data19.csv")
+    test_data = pd.read_csv("data/mpc_data_test9.csv")
+    autoencoder = Autoencoder(x_dim=20, x_rom_dim=1)
+    autoencoder.fit(data, test_data)
     # with open("heatEq_autoencoder_3dim_tanh.pickle", "wb") as model:
     #     pickle.dump(autoencoder, model)
 
-    data_fit = pd.read_csv("data/sindy_fit_data.csv")
-    data_score = pd.read_csv("data/sindy_validation_data.csv")
+    data_fit = pd.read_csv("data/mpc_data19.csv")
+    data_score = pd.read_csv("data/mpc_data_test9.csv")
     autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
     sindy(autoencoder, data_fit, data_score)
 
     x_rom_setpoints = discover_objectives(autoencoder)
 
-    # autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
-    # input_weight = autoencoder.decoder.input.weight.detach().cpu().numpy().T
-    # input_bias = autoencoder.decoder.input.bias.detach().cpu().numpy().T
-    # h1_weight = autoencoder.decoder.h1.weight.detach().cpu().numpy().T
-    # h1_bias = autoencoder.decoder.h1.bias.detach().cpu().numpy().T
-    # h2_weight = autoencoder.decoder.h2.weight.detach().cpu().numpy().T
-    # h2_bias = autoencoder.decoder.h2.bias.detach().cpu().numpy().T
-    # h3_weight = autoencoder.decoder.h3.weight.detach().cpu().numpy().T
-    # h3_bias = autoencoder.decoder.h3.bias.detach().cpu().numpy().T
+    autoencoder = load_pickle("heatEq_autoencoder_3dim_tanh.pickle")
+    input_weight = autoencoder.decoder.input.weight.detach().cpu().numpy().T
+    input_bias = autoencoder.decoder.input.bias.detach().cpu().numpy().T
+    h1_weight = autoencoder.decoder.h1.weight.detach().cpu().numpy().T
+    h1_bias = autoencoder.decoder.h1.bias.detach().cpu().numpy().T
+    h2_weight = autoencoder.decoder.h2.weight.detach().cpu().numpy().T
+    h2_bias = autoencoder.decoder.h2.bias.detach().cpu().numpy().T
+    h3_weight = autoencoder.decoder.h3.weight.detach().cpu().numpy().T
+    h3_bias = autoencoder.decoder.h3.bias.detach().cpu().numpy().T
     #
-    # np.save("autoencoder_weights_biases_tanh/input_weight", input_weight)
-    # np.save("autoencoder_weights_biases_tanh/input_bias", input_bias)
-    # np.save("autoencoder_weights_biases_tanh/h1_weight", h1_weight)
-    # np.save("autoencoder_weights_biases_tanh/h1_bias", h1_bias)
-    # np.save("autoencoder_weights_biases_tanh/h2_weight", h2_weight)
-    # np.save("autoencoder_weights_biases_tanh/h2_bias", h2_bias)
-    # np.save("autoencoder_weights_biases_tanh/h3_weight", h3_weight)
-    # np.save("autoencoder_weights_biases_tanh/h3_bias", h3_bias)
+    np.save("autoencoder_weights_biases_tanh/input_weight", input_weight)
+    np.save("autoencoder_weights_biases_tanh/input_bias", input_bias)
+    np.save("autoencoder_weights_biases_tanh/h1_weight", h1_weight)
+    np.save("autoencoder_weights_biases_tanh/h1_bias", h1_bias)
+    np.save("autoencoder_weights_biases_tanh/h2_weight", h2_weight)
+    np.save("autoencoder_weights_biases_tanh/h2_bias", h2_bias)
+    np.save("autoencoder_weights_biases_tanh/h3_weight", h3_weight)
+    np.save("autoencoder_weights_biases_tanh/h3_bias", h3_bias)
 
     # W = [input_weight, h1_weight, h2_weight, h3_weight]
     # B = [input_bias, h1_bias, h2_bias, h3_bias]

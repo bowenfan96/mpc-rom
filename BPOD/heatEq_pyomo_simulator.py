@@ -1,13 +1,10 @@
-import csv
 import datetime
-import pickle
 
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from pyomo.environ import *
 from pyomo.dae import *
-from pyomo.solvers import *
+from pyomo.environ import *
 
 results_folder = ""
 
@@ -564,13 +561,13 @@ if __name__ == "__main__":
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
-    # heatEq_system = HeatEqSimulator()
-    # heatEq_system.mpc_control()
-    # main_res, _ = heatEq_system.parse_mpc_results()
+    heatEq_system = HeatEqSimulator()
+    heatEq_system.mpc_control()
+    main_res, _ = heatEq_system.parse_mpc_results()
     # main_res.to_csv("FOM_results.csv")
     # heatEq_system.plot(main_res)
-
-    heatEq_system = HeatEqSimulator()
-    main_res, _ = heatEq_system.simulate_system_rng_controls()
-    print(main_res)
-    heatEq_system.plot(main_res)
+    #
+    # heatEq_system = HeatEqSimulator()
+    # main_res, _ = heatEq_system.simulate_system_rng_controls()
+    # print(main_res)
+    # heatEq_system.plot(main_res)

@@ -1,40 +1,28 @@
-import pyomo.core
-import sklearn.metrics
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from matplotlib import pyplot as plt
-from pyomo.core import Expression
-from sklearn.linear_model import Lasso
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-from torch.utils.data import DataLoader
-from torchinfo import summary
 import pickle
+
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import pysindy
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from matplotlib import pyplot as plt
+from pyomo.core import Expression
+from pyomo.environ import value
 from sklearn import metrics
 from sklearn import preprocessing
-import pysindy
-
-from sklearn.preprocessing import PolynomialFeatures
-from deeptime.sindy import STLSQ
-from deeptime.sindy import SINDy
-
-from scipy import optimize
-
 from sklearn import svm
-
-from pyomo.environ import value
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from torch.utils.data import DataLoader
 
 
 class Encoder(nn.Module):
     def __init__(self, x_dim, x_rom_dim):
         super(Encoder, self).__init__()
-        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)     # max(3, 23//2) = 11
-        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)     # max(3, 23//2) = 11
-        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)     # max(3, 23//4) = 5
+        h1_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)  # max(3, 23//2) = 11
+        h2_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 2)  # max(3, 23//2) = 11
+        h3_nodes = max(x_rom_dim, (x_dim + x_rom_dim) // 4)  # max(3, 23//4) = 5
 
         self.input = nn.Linear(x_dim, h1_nodes)
         self.h1 = nn.Linear(h1_nodes, h2_nodes)
@@ -92,7 +80,7 @@ class Decoder(nn.Module):
 
 
 class Autoencoder:
-    def __init__(self, x_dim, x_rom_dim=3):
+    def __init__(self, x_dim, x_rom_dim):
         self.encoder = Encoder(x_dim, x_rom_dim)
         self.decoder = Decoder(x_dim, x_rom_dim)
 
@@ -130,7 +118,7 @@ class Autoencoder:
         self.encoder.train()
         self.decoder.train()
 
-        mb_loader = torch.utils.data.DataLoader(x, batch_size=100, shuffle=True)
+        mb_loader = torch.utils.data.DataLoader(x, batch_size=110, shuffle=False)
 
         param_wrapper = nn.ParameterList()
         param_wrapper.extend(self.encoder.parameters())
@@ -182,7 +170,7 @@ class Autoencoder:
     def decode(self, x_rom_nparr):
         # Expected shape of x_rom_nparr is (x_rom_dim, )
         # Reshape to match decoder dimensions
-        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 3)
+        x_rom_nparr = np.array(x_rom_nparr, dtype=np.float32).flatten().reshape(-1, 1)
         x_rom_tensor = torch.tensor(x_rom_nparr)
         self.decoder.eval()
         with torch.no_grad():
@@ -251,9 +239,9 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     x_rom_score = x_rom_scaler.transform(x_rom_score)
 
     # We need to split x_rom and u to into a list of 240 trajectories for sindy
-    num_trajectories = 1680
-    num_trajectories = 240
-    num_trajectories = 180
+    # num_trajectories = 1680
+    # num_trajectories = 240
+    num_trajectories = 400
     u0_list_fit = np.split(u0_fit, num_trajectories)
     u1_list_fit = np.split(u1_fit, num_trajectories)
     u_list_fit = []
@@ -261,8 +249,8 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
         u_list_fit.append(np.hstack((u0_fit.reshape(-1, 1), u1_fit.reshape(-1, 1))))
     x_rom_list_fit = np.split(x_rom_fit, num_trajectories, axis=0)
 
-    num_trajectories = 240
-    num_trajectories = 20
+    # num_trajectories = 240
+    num_trajectories = 100
     u0_list_score = np.split(u0_score, num_trajectories)
     u1_list_score = np.split(u1_score, num_trajectories)
     u_list_score = []
@@ -276,7 +264,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1, include_bias=True)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=True, degree=5, include_bias=True)
     fourier_library = pysindy.FourierLibrary(n_frequencies=3)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
@@ -311,7 +299,7 @@ def sindy(ae_model, dataframe_fit, dataframe_score):
     for i in range(20):
         x_init_df_col.append("x{}".format(i))
     x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_1dim_elu_mpcData_setpoint.pickle")
     x_rom_init = autoencoder.encode(x_init_df).to_numpy()
     x_rom_init_scaled = x_rom_scaler.transform(x_rom_init)
     print("x_init - scaled for sindy dont scale again")
@@ -395,8 +383,8 @@ def sindy_fom(dataframe_fit, dataframe_score):
     # ----- SINDY FROM PYSINDY -----
     # Get the polynomial feature library
     # include_interaction = False precludes terms like x0x1, x2x3
-    poly_library = pysindy.PolynomialLibrary(include_interaction=False, degree=1, include_bias=False)
-    fourier_library = pysindy.FourierLibrary(n_frequencies=3)
+    poly_library = pysindy.PolynomialLibrary(include_interaction=True, degree=5, include_bias=False)
+    fourier_library = pysindy.FourierLibrary(n_frequencies=2)
     identity_library = pysindy.IdentityLibrary()
     combined_library = poly_library + fourier_library + identity_library
 
@@ -430,7 +418,7 @@ def sindy_fom(dataframe_fit, dataframe_score):
     for i in range(20):
         x_init_df_col.append("x{}".format(i))
     x_init_df = pd.DataFrame(x_init, columns=x_init_df_col)
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_1dim_elu_mpcData_setpoint.pickle")
     x_rom_init = autoencoder.encode(x_init_df).to_numpy()
     x_rom_init_scaled = x_rom_scaler.transform(x_rom_init)
     print("x_init - scaled for sindy dont scale again")
@@ -464,15 +452,15 @@ def discover_objectives(ae_model):
     # Encode the final full state of the MPC controlled system
     x_full_setpoint_dict = {}
 
-    # x = [312.043309, 308.530539, 305.935527, 304.179534, 303.210444,
-    #      302.999869, 303.541685, 304.851730, 306.968621, 309.955792,
-    #      313.904979, 318.941577, 325.232511, 332.997712, 342.526917,
-    #      354.204601, 368.547821, 386.265378, 408.354234, 436.265516]
+    x = [312.043309, 308.530539, 305.935527, 304.179534, 303.210444,
+         302.999869, 303.541685, 304.851730, 306.968621, 309.955792,
+         313.904979, 318.941577, 325.232511, 332.997712, 342.526917,
+         354.204601, 368.547821, 386.265378, 408.354234, 436.265516]
 
-    x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
-         302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
-         320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
-         327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
+    # x = [281.901332, 286.207153, 290.410114, 294.513652, 298.529802,
+    #      302.456662, 306.284568, 309.997554, 313.567900, 316.947452,
+    #      320.059310, 322.793336, 325.009599, 326.553958, 327.286519,
+    #      327.112413, 325.983627, 323.826794, 320.424323, 315.694468]
 
     for i in range(20):
         x_full_setpoint_dict["x{}".format(i)] = x[i]
@@ -486,7 +474,7 @@ def discover_objectives(ae_model):
 
 
 def generate_data_for_svm():
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
+    autoencoder = load_pickle("heatEq_autoencoder_1dim_elu_mpcData_setpoint.pickle")
 
     num_samples = 3000
 
@@ -584,16 +572,16 @@ if __name__ == "__main__":
     # generate_data_for_svm()
     # run_svm()
 
-    # data = pd.read_csv("data/mpc_data8.csv")
-    # test_data = pd.read_csv("data/mpc_data9.csv")
-    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=3)
+    # data = pd.read_csv("data/mpc_data19.csv")
+    # test_data = pd.read_csv("data/mpc_data_test9.csv")
+    # autoencoder = Autoencoder(x_dim=20, x_rom_dim=1)
     # autoencoder.fit(data, test_data)
-    # with open("heatEq_autoencoder_3dim_elu_mpcData.pickle", "wb") as model:
+    # with open("heatEq_autoencoder_1dim_elu_mpcData_setpoint.pickle", "wb") as model:
     #     pickle.dump(autoencoder, model)
 
-    data_fit = pd.read_csv("data/mpc_data8.csv")
-    data_score = pd.read_csv("data/mpc_data9.csv")
-    autoencoder = load_pickle("heatEq_autoencoder_3dim_elu_mpcData.pickle")
+    data_fit = pd.read_csv("data/mpc_data19.csv")
+    data_score = pd.read_csv("data/mpc_data_test9.csv")
+    autoencoder = load_pickle("heatEq_autoencoder_1dim_elu_mpcData_setpoint.pickle")
     sindy(autoencoder, data_fit, data_score)
     # sindy_fom(data_fit, data_score)
 

@@ -1,13 +1,8 @@
 import csv
 import datetime
-import pickle
 
-import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
-from pyomo.environ import *
 from pyomo.dae import *
-from pyomo.solvers import *
+from pyomo.environ import *
 
 from heatEq_nn_controller import *
 
@@ -252,18 +247,20 @@ class HeatEqSimulator:
             return m.L_dot[_t] \
                    == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x13[_t] - 333) ** 2) \
                    + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
+
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
         # Objective function is to minimize the Lagrangian cost integral
         def _objective(m):
             return m.L[m.time.last()] - m.L[0]
+
         self.model.objective = Objective(rule=_objective, sense=minimize)
 
         # Constraint for the element at the 1/3 position: path constraint for additional challenge
         # 5t^2 + 10t + 293
-        def _constraint_x5(m, _t):
-            return m.x5[_t] <= (5 * _t ** 2) + (10 * _t) + 293
-        self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
+        # def _constraint_x5(m, _t):
+        #     return m.x5[_t] <= (5 * _t ** 2) + (10 * _t) + 293
+        # self.model.constraint_x5 = Constraint(self.model.time, rule=_constraint_x5)
 
         # ----- DISCRETIZE THE MODEL INTO FINITE ELEMENTS -----
         # We need to discretize before adding ODEs in matrix form
@@ -281,6 +278,7 @@ class HeatEqSimulator:
         mpc_solver = SolverFactory("ipopt", tee=True)
         # mpc_solver.options['max_iter'] = 10000
         mpc_results = mpc_solver.solve(self.model)
+        print(mpc_results)
 
         return mpc_results
 
@@ -848,7 +846,7 @@ if __name__ == "__main__":
     # main_simple_sys.plot(main_res)
     # print(main_res)
 
-    replay("heatEq_240_trajectories_df.csv")
+    # replay("heatEq_240_trajectories_df.csv")
 
     # heatEq_system = HeatEqSimulator()
     # main_res, _ = heatEq_system.simulate_system_sindy_controls()
@@ -857,7 +855,7 @@ if __name__ == "__main__":
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
-    # heatEq_system = HeatEqSimulator()
-    # heatEq_system.mpc_control()
+    heatEq_system = HeatEqSimulator()
+    heatEq_system.mpc_control()
     # main_res, _ = heatEq_system.parse_mpc_results()
     # heatEq_system.plot(main_res)

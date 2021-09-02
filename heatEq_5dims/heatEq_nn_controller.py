@@ -1,27 +1,20 @@
-import time
-from itertools import chain
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from matplotlib import pyplot as plt
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator
-from torch.utils.data import DataLoader
-from torchinfo import summary
 import pickle
+import time
+
 import numpy as np
 import pandas as pd
-from sklearn import preprocessing
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 from scipy import optimize
+from sklearn import preprocessing
+from torch.utils.data import DataLoader
 
 # Enable this for hyperparameter tuning
 # from functools import partial
 # from ray import tune
 # from ray.tune import CLIReporter
-
-import time as python_timer
 
 data_folder = "data/"
 results_folder = "expReplay_results/point07_12nodes_h1ctg/"
@@ -256,6 +249,7 @@ class HeatEqNNController:
             return best_u_with_noise
 
         elif mode == "basinhopper":
+            print(time.time())
             def basinhopper_helper(u_bh, *arg_x_bh):
                 x_bh = arg_x_bh[0]
                 x_bh = np.array(x_bh).flatten()
@@ -286,8 +280,9 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=2, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=10, minimizer_kwargs=min_kwargs
             )
+            print(time.time())
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
             # Add some noise to encourage exploration
@@ -341,14 +336,13 @@ def load_pickle(filename="heatEq_nn_controller_5dim.pickle"):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv(data_folder + "heatEq_240_trajectories_rng.csv")
-    heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=5, u_dim=2)
-    heatEq_nn.fit(data)
+    # data = pd.read_csv(data_folder + "heatEq_240_trajectories_rng.csv")
+    # heatEq_nn = HeatEqNNController(x_dim=20, x_rom_dim=5, u_dim=2)
+    # heatEq_nn.fit(data)
 
     # with open("heatEq_nn_controller_5dim.pickle", "wb") as pickle_file:
     #     pickle.dump(heatEq_nn, pickle_file)
 
-    # heatEq_nn = load_pickle()
-    # x = np.full(shape=(20, ), fill_value=273)
-    # heatEq_nn.get_u_opt(x)
-
+    heatEq_nn = load_pickle()
+    x = np.full(shape=(20,), fill_value=273)
+    heatEq_nn.get_u_opt(x)

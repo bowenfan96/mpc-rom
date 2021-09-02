@@ -1,13 +1,8 @@
 import csv
 import datetime
-import pickle
 
-import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
-from pyomo.environ import *
 from pyomo.dae import *
-from pyomo.solvers import *
+from pyomo.environ import *
 
 from heatEq_nn_controller import *
 
@@ -244,14 +239,14 @@ class HeatEqSimulator:
         # We would like to minimize the controller costs too, in terms of how much heating or cooling is applied
 
         # Define weights for setpoint and controller objectives
-        setpoint_weight = 1
+        setpoint_weight = 0.995
         controller_weight = 1 - setpoint_weight
 
         # Lagrangian cost
         def _Lagrangian(m, _t):
             return m.L_dot[_t] \
-                   == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x13[_t] - 333) ** 2)
-                   # + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
+                   == setpoint_weight * ((m.x5[_t] - 303) ** 2 + (m.x13[_t] - 333) ** 2) \
+                   + controller_weight * ((m.u0[_t] - 273) ** 2 + (m.u1[_t] - 273) ** 2)
         self.model.L_integral = Constraint(self.model.time, rule=_Lagrangian)
 
         # Objective function is to minimize the Lagrangian cost integral
@@ -281,7 +276,7 @@ class HeatEqSimulator:
         mpc_solver = SolverFactory("ipopt", tee=True)
         # mpc_solver.options['max_iter'] = 10000
         mpc_results = mpc_solver.solve(self.model)
-        self.model.display()
+        # self.model.display()
         print(mpc_results)
 
         return mpc_results
@@ -871,18 +866,11 @@ if __name__ == "__main__":
     # print(main_res)
     # main_res.to_csv("heatEq_mpc_trajectory.csv")
 
-    df_list = []
-    for j in range(20):
-        for i in range(20):
-            heatEq_system = HeatEqSimulator()
-            heatEq_system.mpc_control()
-            # heatEq_system.model.display()
-            main_res, _ = heatEq_system.parse_mpc_results()
-            df_list.append(main_res)
-            # heatEq_system.plot(main_res)
-        export_data = pd.concat(df_list)
-        export_data.to_csv("mpc_trajectories/mpc_data{}.csv".format(j))
-
+    heatEq_system = HeatEqSimulator()
+    heatEq_system.mpc_control()
+    # heatEq_system.model.display()
+    # main_res, _ = heatEq_system.parse_mpc_results()
+    # heatEq_system.plot(main_res)
 
     # import timeit
     # timer = timeit.timeit("timetest()", setup="from __main__ import timetest", number=1)

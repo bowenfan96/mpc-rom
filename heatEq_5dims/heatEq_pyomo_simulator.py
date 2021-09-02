@@ -1,13 +1,9 @@
 import csv
 import datetime
-import pickle
 
-import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
-from pyomo.environ import *
 from pyomo.dae import *
-from pyomo.solvers import *
+from pyomo.environ import *
 
 from heatEq_nn_controller import *
 
@@ -348,7 +344,7 @@ class HeatEqSimulator:
         mpc_solver = SolverFactory("ipopt", tee=True)
         mpc_results = mpc_solver.solve(self.model)
         print(mpc_results)
-        self.model.display()
+        # self.model.display()
 
         return mpc_results
 
@@ -937,9 +933,9 @@ if __name__ == "__main__":
 
     heatEq_system = HeatEqSimulator()
     heatEq_system.mpc_control()
-    main_res, _ = heatEq_system.parse_mpc_results()
+    # main_res, _ = heatEq_system.parse_mpc_results()
     # main_res.to_csv("FOM_results.csv")
-    heatEq_system.plot(main_res)
+    # heatEq_system.plot(main_res)
 
     # import timeit
     # timer = timeit.timeit("timetest()", setup="from __main__ import timetest", number=1)

@@ -1,26 +1,20 @@
-from itertools import chain
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from matplotlib import pyplot as plt
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator
-from torch.utils.data import DataLoader
-from torchinfo import summary
 import pickle
+import time
+
 import numpy as np
 import pandas as pd
-from sklearn import preprocessing
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 from scipy import optimize
+from sklearn import preprocessing
+from torch.utils.data import DataLoader
 
 # Enable this for hyperparameter tuning
 # from functools import partial
 # from ray import tune
 # from ray.tune import CLIReporter
-
-import time as python_timer
 
 results_folder = "expReplay_results/arc12/"
 
@@ -245,6 +239,7 @@ class HeatEqNNController:
             return best_u_with_noise
 
         elif mode == "basinhopper":
+            print(time.time())
             def basinhopper_helper(u_bh, *arg_x_bh):
                 x_bh = arg_x_bh[0]
                 x_bh = np.array(x_bh).flatten()
@@ -257,7 +252,7 @@ class HeatEqNNController:
 
             # Configure options for the local minimizer (Powell)
             gd_options = {}
-            # gd_options["maxiter"] = 10
+            gd_options["maxiter"] = 10
             # gd_options["disp"] = True
             # gd_options["eps"] = 1
 
@@ -273,8 +268,10 @@ class HeatEqNNController:
                 "bounds": bounds
             }
             result = optimize.basinhopping(
-                func=basinhopper_helper, x0=[273, 273], niter=8, minimizer_kwargs=min_kwargs
+                func=basinhopper_helper, x0=[273, 273], niter=5, minimizer_kwargs=min_kwargs
             )
+            print(time.time())
+
             # result["x"] is the optimal u, don't be confused by the name!
             u_opt = np.array(result["x"]).flatten()
             # Add some noise to encourage exploration
@@ -319,7 +316,6 @@ if __name__ == "__main__":
     # with open("heatEq_nn_controller_240.pickle", "wb") as pickle_file:
     #     pickle.dump(heatEq_nn, pickle_file)
 
-    # heatEq_nn = load_pickle()
-    # x = np.full(shape=(20, ), fill_value=273)
-    # heatEq_nn.get_u_opt(x)
-
+    heatEq_nn = load_pickle()
+    x = np.full(shape=(20,), fill_value=273)
+    heatEq_nn.get_u_opt(x)

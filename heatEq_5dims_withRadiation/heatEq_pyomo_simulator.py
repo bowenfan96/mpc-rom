@@ -1,14 +1,8 @@
 import csv
 import datetime
-import pickle
 
-import matplotlib
-import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
-from pyomo.environ import *
 from pyomo.dae import *
-from pyomo.solvers import *
+from pyomo.environ import *
 
 from heatEq_nn_controller import *
 
@@ -320,6 +314,7 @@ class HeatEqSimulator:
         mpc_solver = SolverFactory("ipopt", tee=True)
         # mpc_solver.options['max_iter'] = 10000
         mpc_results = mpc_solver.solve(self.model)
+        print(mpc_results)
 
         return mpc_results
 
@@ -595,33 +590,30 @@ class HeatEqSimulator:
     def simulate_system_sindy_controls(self):
         timesteps = [timestep / 10 for timestep in range(11)]
 
-        u0_nn = [322.9563254,
-173.0186607,
-173.0188708,
-472.8931624,
-283.0565085,
-417.8779231,
-410.1953802,
-464.3188755,
-472.8905774,
-472.8924449,
-472.891716
-
+        u0_nn = [363.3405546,
+                 376.7400036,
+                 336.2204065,
+                 371.1202803,
+                 375.6158267,
+                 376.4081908,
+                 377.8088267,
+                 378.595471,
+                 377.2827539,
+                 377.1972135,
+                 377.0674779
 
                  ]
-        u1_nn = [322.9702283,
-472.7133161,
-472.7132842,
-472.7130589,
-273.6717801,
-290.5229226,
-358.4480267,
-388.3372644,
-421.8174325,
-460.1723944,
-472.6993367
-
-
+        u1_nn = [386.0000015,
+                 425.4160013,
+                 386.7017847,
+                 384.3195169,
+                 360.5479373,
+                 335.0233739,
+                 460.2573613,
+                 292.8799127,
+                 447.6992591,
+                 315.8689022,
+                 318.6579929
                  ]
 
         self.model.var_input = Suffix(direction=Suffix.LOCAL)
@@ -733,8 +725,13 @@ class HeatEqSimulator:
         fig, axs = plt.subplots(3, constrained_layout=True)
         fig.set_size_inches(5, 10)
 
+        x5_path_cst = []
+        # 5t^2 + 10t + 293
+        for ts in t:
+            x5_path_cst.append((5 * ts ** 2) + (10 * ts) + 293)
+
         axs[0].plot(t, x5, label="$x_5$")
-        # axs[0].plot(t, np.full(shape=(t.size,), fill_value=313), label="Constraint for $x_5$")
+        axs[0].plot(t, x5_path_cst, label="Path constraint for $x_5$")
         axs[0].plot(t, np.full(shape=(t.size,), fill_value=303), "--", label="Setpoint for $x_5$")
         axs[0].legend()
 
@@ -911,15 +908,15 @@ if __name__ == "__main__":
 
     # replay("heatEq_240_trajectories_df.csv")
 
-    heatEq_system = HeatEqSimulator()
-    main_res, _ = heatEq_system.simulate_system_sindy_controls()
-    heatEq_system.plot(main_res)
-    pd.set_option('display.max_columns', None)
-    print(main_res)
-    main_res.to_csv("heatEq_mpc_trajectory.csv")
-
     # heatEq_system = HeatEqSimulator()
-    # heatEq_system.mpc_control()
+    # main_res, _ = heatEq_system.simulate_system_sindy_controls()
+    # heatEq_system.plot(main_res)
+    # pd.set_option('display.max_columns', None)
+    # print(main_res)
+    # main_res.to_csv("heatEq_mpc_trajectory.csv")
+
+    heatEq_system = HeatEqSimulator()
+    heatEq_system.mpc_control()
     # main_res, _ = heatEq_system.parse_mpc_results()
     # pd.set_option('display.max_columns', None)
     # print(main_res)
